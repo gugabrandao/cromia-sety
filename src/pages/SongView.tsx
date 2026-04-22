@@ -25,8 +25,34 @@ export default function SongView() {
 
   // Display Settings
   const [isEditing, setIsEditing] = useState(false);
+  const [editMode, setEditMode] = useState<'live' | 'classic'>('live');
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editedContent, setEditedContent] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+
+  const addToHistory = (content: string) => {
+    setHistory(prev => {
+      const newHistory = [content, ...prev];
+      return newHistory.slice(0, 10); // Keep last 10 steps
+    });
+  };
+
+  const handleUndo = () => {
+    if (history.length > 0) {
+      const lastVersion = history[0];
+      setEditedContent(lastVersion);
+      setHistory(prev => prev.slice(1));
+    }
+  };
+
+  const handleCancel = () => {
+    if (confirm('Deseja descartar as alterações não salvas?')) {
+      setEditedContent(song.content_raw || '');
+      setIsEditing(false);
+      setHistory([]);
+    }
+  };
 
   // Advanced Settings State with LocalStorage persistence
   const [settings, setSettings] = useState(() => {
@@ -119,7 +145,35 @@ export default function SongView() {
     fetchSong();
   }, [id]);
 
+  const handlePartChange = (lineIdx: number, partIdx: number, newValue: string, isChord: boolean) => {
+    const lines = editedContent.split('\n');
+    const line = lines[lineIdx];
+    // This regex matches [chords] and the text between them
+    const parts = line.split(/(\[.*?\])/g);
+    
+    if (isChord) {
+      // Ensure we don't end up with nested brackets or empty brackets
+      const cleanChord = newValue.replace(/[\[\]]/g, '').trim();
+      if (cleanChord) {
+        parts[partIdx] = `[${cleanChord}]`;
+      } else {
+        // If chord is deleted, we could remove it, but for now let's keep it as [?] or empty
+        parts[partIdx] = ''; 
+      }
+    } else {
+      parts[partIdx] = newValue;
+    }
+    
+    // Save current version to history before changing
+    addToHistory(editedContent);
+    
+    lines[lineIdx] = parts.join('');
+    setEditedContent(lines.join('\n'));
+  };
+
+
   const updateScrollSpeed = async (newSpeed: number) => {
+
     // 1. Update UI immediately for responsiveness
     const newSettings = { ...settings, scrollSpeed: newSpeed };
     setSettings(newSettings);
@@ -599,11 +653,31 @@ export default function SongView() {
             </div>
 
             <div className="mt-8 pt-8 border-t border-foreground/10 space-y-4">
+              <div className="flex gap-4">
+                <button
+                  onClick={handleUndo}
+                  disabled={history.length === 0}
+                  className={`flex-1 py-4 font-bold rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 ${history.length === 0 ? 'opacity-30 cursor-not-allowed bg-foreground/5' : 'bg-brand-purple/10 text-brand-accent hover:bg-brand-purple/20'}`}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Voltar ({history.length})
+                </button>
+              </div>
+
               <button
                 onClick={handleDefinitiveChange}
-                className="w-full py-4 font-bold rounded-2xl transition-all shadow-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
+                className="w-full py-4 font-bold rounded-2xl transition-all shadow-lg bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white flex items-center justify-center gap-2"
               >
-                Definitive Change
+                <Check className="w-5 h-5" />
+                Salvar Alterações
+              </button>
+
+              <button
+                onClick={handleCancel}
+                className="w-full py-4 font-bold rounded-2xl transition-all shadow-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center gap-2"
+              >
+                <X className="w-5 h-5" />
+                Cancelar
               </button>
 
               <button
@@ -613,6 +687,7 @@ export default function SongView() {
                 {t('done')}
               </button>
             </div>
+
           </div>
         </div>
       )}
@@ -707,7 +782,24 @@ export default function SongView() {
 
         {/* Chord Rendering Section */}
         <div className="chord-sheet-container">
-          {isEditing ? (
+          {isEditing && (
+            <div className="flex gap-2 mb-6 p-1 bg-foreground/5 rounded-2xl w-fit">
+              <button 
+                onClick={() => setEditMode('live')}
+                className={`px-6 py-2 rounded-xl font-bold text-sm transition-all ${editMode === 'live' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40 hover:text-foreground'}`}
+              >
+                Visual Edit
+              </button>
+              <button 
+                onClick={() => setEditMode('classic')}
+                className={`px-6 py-2 rounded-xl font-bold text-sm transition-all ${editMode === 'classic' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40 hover:text-foreground'}`}
+              >
+                Classic ChordPro
+              </button>
+            </div>
+          )}
+
+          {isEditing && editMode === 'classic' ? (
             <textarea
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
@@ -715,147 +807,123 @@ export default function SongView() {
               placeholder="Paste or edit your chords here..."
             />
           ) : (
-            <div className="leading-relaxed">
-              {(() => {
-                const lines = song.content_raw?.split('\n') || [];
+            <div className={`leading-relaxed ${isEditing ? 'editing-mode cursor-text' : ''}`}>
 
-                // Pass 1: Filter hidden lines
-                const filteredLines = lines.map((line: string, i: number) => {
-                  const trimmed = line.trim();
-                  const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(trimmed) || line.includes('---');
-                  
-                  if (!settings.showTabs) {
-                    if (isTabLine) return null;
-                    
-                    // Hide tab headers and related terms
-                    if (/^\[.*\]$/.test(trimmed)) {
-                      const tl = trimmed.toLowerCase();
-                      if (tl.includes('tab') || tl.includes('riff') || tl.includes('dedilhado')) return null;
-                    }
+            {(() => {
+              const contentToUse = isEditing ? editedContent : (song.content_raw || '');
+              const lines = contentToUse.split('\n');
 
-                    // Hide "Parte X de Y" lines (including variations)
-                    if (/^Parte\s+\d+\s+de\s+\d+/i.test(trimmed)) return null;
+              // Pass 1: Filter hidden lines
+              const filteredLines = lines.map((line: string, i: number) => {
+                const trimmed = line.trim();
+                const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(trimmed) || line.includes('---');
+                
+                if (!settings.showTabs && isTabLine) return null;
+                return line;
+              }).filter((l: string | null) => l !== null) as string[];
 
-                    // Hide technical tab notations (H.N., P.M., etc. with dots/spaces)
-                    if (/^(H\.N\.|P\.M\.)[\s\.\-]*$/i.test(trimmed)) return null;
+              // Pass 2: Collapse consecutive empty lines
+              const collapsedLines = filteredLines.filter((line: string, i: number) => {
+                if (line.trim() === '' && i > 0 && filteredLines[i - 1].trim() === '') return false;
+                return true;
+              });
 
-                    // Hide pure chord lines immediately preceding a tab
-                    const isPureBracketChordLine = trimmed.length > 0 && trimmed.split(/\s+/).every((p: string) => /^\[[A-G].*?\]$/.test(p));
-                    if (isPureBracketChordLine) {
-                      let nextNonEmptyLine = '';
-                      for (let j = i + 1; j < lines.length; j++) {
-                        if (lines[j].trim() !== '') {
-                          nextNonEmptyLine = lines[j].trim();
-                          break;
+              return (
+                <div className="space-y-1">
+                  {collapsedLines.map((line: string, i: number) => {
+                    const displayLine = line;
+                    const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(displayLine) || displayLine.includes('---');
+                    const isChordProLine = !isTabLine && /\[.*?\]/.test(displayLine);
+
+                    if (isChordProLine) {
+                      const rawParts = displayLine.split(/(\[.*?\])/g);
+                      const tokens: { top: string; isChord: boolean; bottom: string; partIdx: number }[] = [];
+                      let k = 0;
+                      while (k < rawParts.length) {
+                        const part = rawParts[k];
+                        if (part.startsWith('[') && part.endsWith(']')) {
+                          const content = part.slice(1, -1);
+                          let displayTop = content;
+                          if (isChord(content) && transpose !== 0) displayTop = transposeLine(content, transpose);
+                          const bottom = rawParts[k + 1] ?? '';
+                          tokens.push({ top: displayTop, isChord: isChord(content), bottom, partIdx: k });
+                          k += 2;
+                        } else {
+                          if (part !== '') tokens.push({ top: '', isChord: false, bottom: part, partIdx: k });
+                          k++;
                         }
-                      }
-                      const isNextTab = /^[A-Ge]\|[-|0-9a-z ]+/i.test(nextNonEmptyLine) || nextNonEmptyLine.includes('---');
-                      if (isNextTab) return null;
-                    }
-                  }
-
-                  return line;
-                }).filter((l: string | null) => l !== null) as string[];
-
-                // Pass 2: Collapse consecutive empty lines
-                const collapsedLines = filteredLines.filter((line: string, i: number) => {
-                  if (line.trim() === '' && i > 0 && filteredLines[i - 1].trim() === '') return false;
-                  return true;
-                });
-
-                return (
-                  <>
-                    {collapsedLines.map((line: string, i: number) => {
-                      const displayLine = line;
-                      const trimmed = displayLine.trim();
-                      const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(trimmed) || displayLine.includes('---');
-                      const isChordProLine = !isTabLine && /\[.*?\]/.test(displayLine);
-
-                      if (isChordProLine) {
-                        const rawParts = displayLine.split(/(\[.*?\])/);
-                        const tokens: { top: string; isChord: boolean; bottom: string }[] = [];
-                        let k = 0;
-                        while (k < rawParts.length) {
-                          const part = rawParts[k];
-                          if (part.startsWith('[') && part.endsWith(']')) {
-                            const content = part.slice(1, -1);
-                            let displayTop = content;
-                            if (isChord(content) && transpose !== 0) displayTop = transposeLine(content, transpose);
-                            const bottom = rawParts[k + 1] ?? '';
-                            tokens.push({ top: displayTop, isChord: isChord(content), bottom });
-                            k += 2;
-                          } else {
-                            if (part !== '') tokens.push({ top: '', isChord: false, bottom: part });
-                            k++;
-                          }
-                        }
-
-                        const isStandaloneSection = tokens.length === 1 && !tokens[0].isChord && tokens[0].top !== '' && !tokens[0].bottom.trim();
-                        const isPureChordLine = tokens.every(t => t.bottom.trim() === '');
-
-                        if (isPureChordLine && !isStandaloneSection) {
-                          return (
-                            <div key={i} className="pt-3 pb-1 whitespace-pre flex flex-wrap">
-                              {tokens.map((tok, idx) => (
-                                <span
-                                  key={idx}
-                                  className={`whitespace-pre ${tok.isChord ? `font-bold ${settings.chords.font}` : `${settings.sections?.font || 'font-outfit'} ${settings.sections?.italic ? 'italic' : ''} ${settings.sections?.bold ? 'font-bold' : ''}`}`}
-                                  style={{
-                                    fontSize: `${tok.isChord ? settings.chords.size : (settings.sections?.size || settings.chords.size)}px`,
-                                    color: getEffectiveColor(tok.isChord ? settings.chords.color : (settings.sections?.color || '#a855f7')),
-                                  }}
-                                >
-                                  {tok.top}{tok.bottom}
-                                </span>
-                              ))}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div key={i} className={`flex flex-wrap items-end pb-1 ${isStandaloneSection ? 'mt-8' : 'pt-3'}`}>
-                            {tokens.map((tok, idx) => (
-                              <div key={idx} className="flex flex-col items-start">
-                                <span
-                                  className={`whitespace-pre leading-tight ${tok.top === '' ? 'pointer-events-none select-none' : tok.isChord ? `font-bold cursor-pointer hover:opacity-80 transition-opacity ${settings.chords.font}` : `${settings.sections?.font || 'font-outfit'} ${settings.sections?.italic ? 'italic' : ''} ${settings.sections?.bold ? 'font-bold' : ''}`}`}
-                                  style={{
-                                    fontSize: `${tok.isChord ? settings.chords.size : tok.top !== '' ? (settings.sections?.size || settings.chords.size) : settings.chords.size}px`,
-                                    color: tok.top === '' ? 'transparent' : getEffectiveColor(tok.isChord ? settings.chords.color : (settings.sections?.color || '#a855f7')),
-                                  }}
-                                >
-                                  {tok.top || '\u00A0'}
-                                </span>
-                                <span
-                                  className={`whitespace-pre leading-tight ${settings.lyrics.font}`}
-                                  style={{ fontSize: `${settings.lyrics.size}px`, color: getEffectiveColor(settings.lyrics.color) }}
-                                >
-                                  {tok.bottom}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        );
                       }
 
                       return (
-                        <div
-                          key={i}
-                          className={`py-0.5 whitespace-pre min-h-[1.5em] ${isTabLine ? settings.tabs.font : settings.lyrics.font}`}
-                          style={{
-                            fontSize: isTabLine ? `${settings.tabs.size}px` : `${settings.lyrics.size}px`,
-                            color: getEffectiveColor(isTabLine ? settings.tabs.color : settings.lyrics.color),
-                          }}
-                        >
-                          {displayLine}
+                        <div key={i} className="pt-3 pb-1 whitespace-pre flex flex-wrap">
+                          {tokens.map((tok, idx) => (
+                            <span key={idx} className="flex flex-col">
+                              <span
+                                contentEditable={isEditing}
+                                suppressContentEditableWarning
+                                onBlur={(e) => handlePartChange(i, tok.partIdx, e.currentTarget.textContent || '', true)}
+                                className={`whitespace-pre min-h-[1.2em] min-w-[1ch] ${tok.isChord ? `font-bold ${settings.chords.font}` : `${settings.sections?.font || 'font-outfit'} ${settings.sections?.italic ? 'italic' : ''} ${settings.sections?.bold ? 'font-bold' : ''}`} ${isEditing && tok.isChord ? 'bg-brand-purple/20 px-1 rounded ring-1 ring-brand-purple/30 focus:bg-brand-purple/40 outline-none' : ''}`}
+                                style={{
+                                  fontSize: `${tok.isChord ? settings.chords.size : (settings.sections?.size || settings.chords.size)}px`,
+                                  color: getEffectiveColor(tok.isChord ? settings.chords.color : (settings.sections?.color || '#a855f7')),
+                                  visibility: (tok.top || isEditing) ? 'visible' : 'hidden'
+                                }}
+                              >
+                                {tok.top}
+                              </span>
+                              <span
+                                contentEditable={isEditing}
+                                suppressContentEditableWarning
+                                onBlur={(e) => handlePartChange(i, tok.isChord ? tok.partIdx + 1 : tok.partIdx, e.currentTarget.textContent || '', false)}
+                                className={`whitespace-pre ${settings.lyrics.font} ${isEditing ? 'hover:bg-white/5 focus:bg-white/10 outline-none' : ''}`}
+                                style={{
+                                  fontSize: `${settings.lyrics.size}px`,
+                                  color: getEffectiveColor(settings.lyrics.color)
+                                }}
+                              >
+                                {tok.bottom}
+                              </span>
+                            </span>
+                          ))}
                         </div>
                       );
-                    })}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </div>
+                    }
+
+                    // Fallback for simple lines or tabs
+                    const parts = displayLine.split(/(\[.*?\])/g);
+                    return (
+                      <div key={i} className={`relative min-h-[1.5em] group/line ${isTabLine ? 'font-mono' : ''}`}>
+                        {parts.map((part, pi) => {
+                          const isChordPart = part.startsWith('[') && part.endsWith(']');
+                          return (
+                            <span
+                              key={pi}
+                              contentEditable={isEditing}
+                              suppressContentEditableWarning
+                              onBlur={(e) => handlePartChange(i, pi, e.currentTarget.textContent || '', isChordPart)}
+                              className={`whitespace-pre transition-all ${isEditing ? 'hover:bg-white/5 focus:outline-none focus:bg-white/10 cursor-text' : ''} ${isTabLine ? settings.tabs.font : settings.lyrics.font}`}
+                              style={isTabLine ? {
+                                fontSize: `${settings.tabs.size}px`,
+                                color: getEffectiveColor(settings.tabs.color)
+                              } : {
+                                fontSize: `${settings.lyrics.size}px`,
+                                color: getEffectiveColor(settings.lyrics.color)
+                              }}
+                            >
+                              {isChordPart && !isEditing ? part.slice(1, -1) : part}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+
       </main>
     </div>
   );
