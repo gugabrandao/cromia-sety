@@ -109,21 +109,10 @@ export default function SongView() {
       if (data) {
         setSong(data);
         setEditedContent(data.content_raw || '');
-        if (data.settings) {
-          setSettings((prev: any) => ({
-            ...prev,
-            ...data.settings,
-            title: { ...prev.title, ...(data.settings.title || {}) },
-            artist: { ...prev.artist, ...(data.settings.artist || {}) },
-            observations: { ...prev.observations, italic: true, ...(data.settings.observations || {}) },
-            sections: { ...prev.sections, ...(data.settings.sections || {}) },
-            chords: { ...prev.chords, ...(data.settings.chords || {}) },
-            lyrics: { ...prev.lyrics, ...(data.settings.lyrics || {}) },
-            tabs: { ...prev.tabs, ...(data.settings.tabs || {}) },
-            scrollSpeed: data.settings.scrollSpeed ?? prev.scrollSpeed ?? 5, // Default level 5 (1-10 scale)
-          }));
-        }
+        // Note: Global formatting enabled. Song-specific settings are ignored 
+        // to maintain the same layout across the entire setlist.
       }
+
       if (error) console.error(error);
       setLoading(false);
     }
