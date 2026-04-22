@@ -9,6 +9,7 @@ export interface SongResult {
   slug_song: string;
   slug_artist: string;
   source: string;
+  artwork_url?: string;
 }
 
 export const chordService = {
@@ -31,6 +32,9 @@ export const chordService = {
           let cleanTitle = track.trackName.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
           let cleanArtist = track.artistName.trim();
 
+          // Get high-res artwork (600x600)
+          const artwork = track.artworkUrl100 ? track.artworkUrl100.replace('100x100', '600x600') : undefined;
+
           const normalizeSlug = (str: string) => {
             return str.toLowerCase()
               .replace(/\s*\(.*?\)\s*/g, '') // Remove parênteses
@@ -40,8 +44,6 @@ export const chordService = {
               .replace(/[^a-z0-9]+/g, '-') // troca outros símbolos por hífen
               .replace(/^-+|-+$/g, ''); // limpa hífens extras
           };
-
-
 
           const slugArtist = normalizeSlug(cleanArtist);
           const slugSong = normalizeSlug(cleanTitle);
@@ -53,10 +55,12 @@ export const chordService = {
               artist: cleanArtist,
               slug_artist: slugArtist,
               slug_song: slugSong,
-              source: 'cifraclub'
+              source: 'cifraclub',
+              artwork_url: artwork
             });
           }
         });
+
 
         return Array.from(uniqueSongs.values()).slice(0, 10);
       }

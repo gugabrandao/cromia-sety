@@ -130,17 +130,26 @@ function Dashboard() {
                 <Trash2 className="w-4 h-4" />
               </button>
 
-              <div className="aspect-video rounded-xl bg-foreground/5 mb-4 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="aspect-square rounded-xl bg-foreground/5 mb-4 overflow-hidden relative shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <button className="w-10 h-10 rounded-full bg-brand-purple flex items-center justify-center">
                     <Play className="w-4 h-4 fill-white" />
                   </button>
                 </div>
-                {/* Fallback pattern for cover */}
-                <div className="w-full h-full bg-gradient-to-br from-brand-purple/20 to-transparent flex items-center justify-center opacity-40">
-                  <Music2 className="w-12 h-12 text-brand-accent" />
-                </div>
+                
+                {song.artwork_url ? (
+                  <img 
+                    src={song.artwork_url} 
+                    alt={song.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-brand-purple/20 to-transparent flex items-center justify-center opacity-40">
+                    <Music2 className="w-12 h-12 text-brand-accent" />
+                  </div>
+                )}
               </div>
+
               <h4 className="font-bold mb-1 text-foreground truncate">{song.title}</h4>
               <p className="text-xs text-foreground/40 mb-3 truncate">{song.artist}</p>
               <div className="flex gap-2">

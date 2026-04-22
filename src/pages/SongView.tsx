@@ -631,25 +631,33 @@ export default function SongView() {
               />
             </div>
           ) : (
-            <div className="animate-in fade-in duration-300">
-              <h1
-                className={`font-black tracking-tighter ${settings.title.font}`}
-                style={{ fontSize: `${settings.title.size}px`, color: getEffectiveColor(settings.title.color) }}
-              >{song.title}</h1>
-              <h2
-                className={`font-bold opacity-80 -mt-5 ${settings.artist.font}`}
-                style={{ fontSize: `${settings.artist.size}px`, color: getEffectiveColor(settings.artist.color) }}
-              >{song.artist}</h2>
-              {song.observations && (
-                <div
-                  className={`p-2 bg-brand-purple/10 border-l-4 ${isDarkMode ? 'border-white' : 'border-black'} pl-6 rounded-r-xl ${settings.observations.italic ? 'italic' : 'not-italic'} ${settings.observations.font}`}
-                  style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}
-                >
-                  {song.observations}
+            <div className="animate-in fade-in duration-300 flex items-start gap-8">
+              {song.artwork_url && (
+                <div className="w-32 h-32 rounded-2xl overflow-hidden shadow-2xl border border-white/10 shrink-0 hidden md:block">
+                  <img src={song.artwork_url} alt={song.title} className="w-full h-full object-cover" />
                 </div>
               )}
+              <div className="flex-1 min-w-0">
+                <h1
+                  className={`font-black tracking-tighter ${settings.title.font} truncate`}
+                  style={{ fontSize: `${settings.title.size}px`, color: getEffectiveColor(settings.title.color) }}
+                >{song.title}</h1>
+                <h2
+                  className={`font-bold opacity-80 -mt-5 ${settings.artist.font} truncate`}
+                  style={{ fontSize: `${settings.artist.size}px`, color: getEffectiveColor(settings.artist.color) }}
+                >{song.artist}</h2>
+                {song.observations && (
+                  <div
+                    className={`p-2 mt-4 bg-brand-purple/10 border-l-4 ${isDarkMode ? 'border-white' : 'border-black'} pl-6 rounded-r-xl ${settings.observations.italic ? 'italic' : 'not-italic'} ${settings.observations.font}`}
+                    style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}
+                  >
+                    {song.observations}
+                  </div>
+                )}
+              </div>
             </div>
           )}
+
         </div>
 
         {/* Chord Rendering Section */}

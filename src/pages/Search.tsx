@@ -71,9 +71,11 @@ export default function Search() {
         slug_song: song.slug_song,
         source: 'cifraclub',
         source_url: captured.original_url,
+        artwork_url: song.artwork_url,
         content_raw: captured.content,
         fetch_status: 'success'
       } as any);
+
 
       if (error) throw error;
 
