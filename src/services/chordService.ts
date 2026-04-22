@@ -10,6 +10,10 @@ export interface SongResult {
   slug_artist: string;
   source: string;
   artwork_url?: string;
+  album_name?: string;
+  duration_ms?: number;
+  genre?: string;
+  release_date?: string;
 }
 
 export const chordService = {
@@ -56,10 +60,15 @@ export const chordService = {
               slug_artist: slugArtist,
               slug_song: slugSong,
               source: 'cifraclub',
-              artwork_url: artwork
+              artwork_url: artwork,
+              album_name: track.collectionName,
+              duration_ms: track.trackTimeMillis,
+              genre: track.primaryGenreName,
+              release_date: track.releaseDate
             });
           }
         });
+
 
 
         return Array.from(uniqueSongs.values()).slice(0, 10);
