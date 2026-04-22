@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search as SearchIcon, Music2, Plus, Loader2, Guitar, Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { chordService } from '../services/chordService';
+
 import type { SongResult } from '../services/chordService';
 import { supabase } from '../lib/supabase';
 
