@@ -129,7 +129,7 @@ export const chordService = {
     };
 
     // ── Proxy list — ordered by reliability ────────────────────────────────
-    const CF_WORKER = 'https://cromia-sety.guga-br.workers.dev';
+    const CF_WORKER = 'https://sety-proxy.guga-br.workers.dev';
 
     const proxies = [
       `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`,        // 🏆 Seu Cloudflare Worker
