@@ -33,10 +33,13 @@ export const chordService = {
 
           const normalizeSlug = (str: string) => {
             return str.toLowerCase()
-              .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
-              .replace(/[^a-z0-9]+/g, '-') // replace non-alphanumeric with hyphen
-              .replace(/^-+|-+$/g, ''); // trim hyphens
+              .replace(/\s*\(.*?\)\s*/g, '') // Remove tudo entre parênteses: (Live), (Original), etc.
+              .replace(/\s*\[.*?\]\s*/g, '') // Remove colchetes
+              .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
+              .replace(/[^a-z0-9]+/g, '-') // troca tudo que não é letra/número por hífen
+              .replace(/^-+|-+$/g, ''); // remove hífens sobrando no começo/fim
           };
+
 
           const slugArtist = normalizeSlug(cleanArtist);
           const slugSong = normalizeSlug(cleanTitle);
