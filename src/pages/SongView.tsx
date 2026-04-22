@@ -646,9 +646,35 @@ export default function SongView() {
                   className={`font-bold opacity-80 -mt-5 ${settings.artist.font} truncate`}
                   style={{ fontSize: `${settings.artist.size}px`, color: getEffectiveColor(settings.artist.color) }}
                 >{song.artist}</h2>
+
+                {/* Metadata Info Bar */}
+                <div className="flex flex-wrap gap-4 mt-4 opacity-40 text-[10px] font-bold uppercase tracking-widest">
+                  {song.album_name && (
+                    <div className="flex items-center gap-1.5">
+                      <Music2 className="w-3 h-3" />
+                      <span>{song.album_name}</span>
+                    </div>
+                  )}
+                  {song.duration_ms && (
+                    <div className="flex items-center gap-1.5">
+                      <Play className="w-3 h-3" />
+                      <span>
+                        {Math.floor(song.duration_ms / 60000)}:
+                        {String(Math.floor((song.duration_ms % 60000) / 1000)).padStart(2, '0')}
+                      </span>
+                    </div>
+                  )}
+                  {song.genre && (
+                    <div className="flex items-center gap-1.5">
+                      <Guitar className="w-3 h-3" />
+                      <span>{song.genre}</span>
+                    </div>
+                  )}
+                </div>
+
                 {song.observations && (
                   <div
-                    className={`p-2 mt-4 bg-brand-purple/10 border-l-4 ${isDarkMode ? 'border-white' : 'border-black'} pl-6 rounded-r-xl ${settings.observations.italic ? 'italic' : 'not-italic'} ${settings.observations.font}`}
+                    className={`p-2 mt-6 bg-brand-purple/10 border-l-4 ${isDarkMode ? 'border-white' : 'border-black'} pl-6 rounded-r-xl ${settings.observations.italic ? 'italic' : 'not-italic'} ${settings.observations.font}`}
                     style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}
                   >
                     {song.observations}
@@ -657,6 +683,7 @@ export default function SongView() {
               </div>
             </div>
           )}
+
 
         </div>
 

@@ -154,8 +154,15 @@ function Dashboard() {
               <p className="text-xs text-foreground/40 mb-3 truncate">{song.artist}</p>
               <div className="flex gap-2">
                 <span className="px-2 py-0.5 rounded-md bg-brand-purple/10 text-brand-accent text-[10px] font-bold uppercase">{song.original_key || 'C'}</span>
+                {song.duration_ms && (
+                  <span className="px-2 py-0.5 rounded-md bg-foreground/5 text-foreground/40 text-[10px] font-bold uppercase">
+                    {Math.floor(song.duration_ms / 60000)}:
+                    {String(Math.floor((song.duration_ms % 60000) / 1000)).padStart(2, '0')}
+                  </span>
+                )}
                 <span className="px-2 py-0.5 rounded-md bg-foreground/5 text-foreground/40 text-[10px] font-bold uppercase">4/4</span>
               </div>
+
             </div>
           ))}
 
