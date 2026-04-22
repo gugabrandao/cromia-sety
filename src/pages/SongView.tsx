@@ -543,21 +543,22 @@ export default function SongView() {
                       </div>
                       <div className="space-y-2">
                         <label className={`text-[10px] uppercase ${isDarkMode ? "text-foreground/40" : "text-black/40"}`}>{t('color')}</label>
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-1 items-center">
                           <input
                             type="color"
                             value={elementStyle.color}
                             onChange={(e) => updateSetting(el, 'color', e.target.value)}
-                            className="w-10 h-10 p-0 bg-transparent border-none cursor-pointer overflow-hidden rounded-lg shrink-0"
+                            className="w-8 h-8 p-0 bg-transparent border-none cursor-pointer overflow-hidden rounded-lg shrink-0"
                           />
                           <input
                             type="text"
                             value={elementStyle.color}
                             onChange={(e) => updateSetting(el, 'color', e.target.value)}
-                            className={`flex-1 text-[10px] font-mono px-2 py-2 rounded-lg border transition-all outline-none focus:ring-1 focus:ring-brand-purple ${isDarkMode ? "bg-foreground/10 border-white/10 text-white" : "bg-black/5 border-black/10 text-black"}`}
-                            placeholder="#FFFFFF"
+                            className={`w-[70px] text-[9px] font-mono px-1.5 py-1.5 rounded-lg border transition-all outline-none focus:ring-1 focus:ring-brand-purple ${isDarkMode ? "bg-foreground/10 border-white/10 text-white" : "bg-black/5 border-black/10 text-black"}`}
+                            placeholder="#HEX"
                           />
                         </div>
+
                       </div>
                     </div>
                     <div className="space-y-2">
