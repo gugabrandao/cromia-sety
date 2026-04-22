@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Settings, Play, Pause,
-  Loader2, Minus, Plus, Check, Guitar, X, Sun, Moon
+  Loader2, Minus, Plus, Check, Guitar, X, Sun, Moon, Music2
 } from 'lucide-react';
+
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
 
