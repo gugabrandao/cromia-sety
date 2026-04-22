@@ -39,8 +39,10 @@ export default function SongView() {
       chords: { size: 20, color: '#a855f7', font: 'font-mono-custom' },
       lyrics: { size: 20, color: '#ffffff', font: 'font-inter' },
       tabs: { size: 14, color: '#ffffff', font: 'font-courier' },
+      metadata: { size: 10, color: '#ffffff', font: 'font-inter', bold: true },
       showTabs: true,
       showSections: true,
+      showMetadata: true,
       isDarkMode: true
     };
     return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
@@ -505,6 +507,16 @@ export default function SongView() {
                     <div className={`w-3 h-3 bg-white rounded-full transition-all ${settings.showTabs ? 'translate-x-5' : 'translate-x-0'}`} />
                   </div>
                 </button>
+
+                <button
+                  onClick={() => setSettings((prev: any) => ({ ...prev, showMetadata: !prev.showMetadata }))}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col items-center gap-2 ${settings.showMetadata ? 'bg-brand-purple/20 border-brand-purple' : (isDarkMode ? 'bg-foreground/5 border-white/5' : 'bg-black/5 border-black/5')}`}
+                >
+                  <span className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-white/60' : 'text-black/60'}`}>Info</span>
+                  <div className={`w-10 h-5 rounded-full p-1 transition-all ${settings.showMetadata ? 'bg-brand-purple' : (isDarkMode ? 'bg-foreground/20' : 'bg-black/20')}`}>
+                    <div className={`w-3 h-3 bg-white rounded-full transition-all ${settings.showMetadata ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                </button>
               </div>
 
               {/* Transpose Control */}
@@ -518,7 +530,7 @@ export default function SongView() {
               </div>
 
               {/* Element Styling Sections */}
-              {['title', 'artist', 'sections', 'observations', 'chords', 'lyrics', 'tabs'].map((el) => {
+              {['title', 'artist', 'metadata', 'sections', 'observations', 'chords', 'lyrics', 'tabs'].map((el) => {
                 const elementStyle = (settings as any)[el];
                 return (
                   <div key={el} className={`p-4 rounded-2xl border space-y-4 ${isDarkMode ? "bg-foreground/5 border-white/5" : "bg-black/5 border-black/10"}`}>
@@ -542,12 +554,21 @@ export default function SongView() {
                       </div>
                       <div className="space-y-2">
                         <label className={`text-[10px] uppercase ${isDarkMode ? "text-foreground/40" : "text-black/40"}`}>{t('color')}</label>
-                        <input
-                          type="color"
-                          value={elementStyle.color}
-                          onChange={(e) => updateSetting(el, 'color', e.target.value)}
-                          className="w-full h-8 bg-transparent border-none cursor-pointer"
-                        />
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="color"
+                            value={elementStyle.color}
+                            onChange={(e) => updateSetting(el, 'color', e.target.value)}
+                            className="w-10 h-10 p-0 bg-transparent border-none cursor-pointer overflow-hidden rounded-lg shrink-0"
+                          />
+                          <input
+                            type="text"
+                            value={elementStyle.color}
+                            onChange={(e) => updateSetting(el, 'color', e.target.value)}
+                            className={`flex-1 text-[10px] font-mono px-2 py-2 rounded-lg border transition-all outline-none focus:ring-1 focus:ring-brand-purple ${isDarkMode ? "bg-foreground/10 border-white/10 text-white" : "bg-black/5 border-black/10 text-black"}`}
+                            placeholder="#FFFFFF"
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -649,29 +670,35 @@ export default function SongView() {
                 >{song.artist}</h2>
 
                 {/* Metadata Info Bar */}
-                <div className="flex flex-wrap gap-4 mt-4 opacity-40 text-[10px] font-bold uppercase tracking-widest">
-                  {song.album_name && (
-                    <div className="flex items-center gap-1.5">
-                      <Music2 className="w-3 h-3" />
-                      <span>{song.album_name}</span>
-                    </div>
-                  )}
-                  {song.duration_ms && (
-                    <div className="flex items-center gap-1.5">
-                      <Play className="w-3 h-3" />
-                      <span>
-                        {Math.floor(song.duration_ms / 60000)}:
-                        {String(Math.floor((song.duration_ms % 60000) / 1000)).padStart(2, '0')}
-                      </span>
-                    </div>
-                  )}
-                  {song.genre && (
-                    <div className="flex items-center gap-1.5">
-                      <Guitar className="w-3 h-3" />
-                      <span>{song.genre}</span>
-                    </div>
-                  )}
-                </div>
+                {settings.showMetadata && (
+                  <div 
+                    className={`flex flex-wrap gap-4 mt-4 opacity-60 uppercase tracking-widest ${settings.metadata.font} ${settings.metadata.bold ? 'font-bold' : ''}`}
+                    style={{ fontSize: `${settings.metadata.size}px`, color: getEffectiveColor(settings.metadata.color) }}
+                  >
+                    {song.album_name && (
+                      <div className="flex items-center gap-1.5">
+                        <Music2 className="w-3 h-3" />
+                        <span>{song.album_name}</span>
+                      </div>
+                    )}
+                    {song.duration_ms && (
+                      <div className="flex items-center gap-1.5">
+                        <Play className="w-3 h-3" />
+                        <span>
+                          {Math.floor(song.duration_ms / 60000)}:
+                          {String(Math.floor((song.duration_ms % 60000) / 1000)).padStart(2, '0')}
+                        </span>
+                      </div>
+                    )}
+                    {song.genre && (
+                      <div className="flex items-center gap-1.5">
+                        <Guitar className="w-3 h-3" />
+                        <span>{song.genre}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
 
                 {song.observations && (
                   <div
