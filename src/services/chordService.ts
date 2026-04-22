@@ -15,33 +15,33 @@ export const chordService = {
   async search(query: string): Promise<SongResult[]> {
     const cleanQuery = query.trim();
     console.log(`Searching for: ${cleanQuery}`);
-    
+
     try {
       // Using iTunes API instead of CifraClub to bypass Cloudflare bot protections
       const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&entity=song&limit=15`;
-      
+
       const response = await fetch(targetUrl);
       const data = await response.json();
-      
+
       if (data && data.results && data.results.length > 0) {
         const uniqueSongs = new Map<string, SongResult>();
-        
+
         data.results.forEach((track: any) => {
           // Remove version info like (Live), (Remastered) from track name for cleaner slugs
           let cleanTitle = track.trackName.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
           let cleanArtist = track.artistName.trim();
-          
+
           const normalizeSlug = (str: string) => {
             return str.toLowerCase()
               .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
               .replace(/[^a-z0-9]+/g, '-') // replace non-alphanumeric with hyphen
               .replace(/^-+|-+$/g, ''); // trim hyphens
           };
-          
+
           const slugArtist = normalizeSlug(cleanArtist);
           const slugSong = normalizeSlug(cleanTitle);
           const key = `${slugArtist}-${slugSong}`;
-          
+
           if (!uniqueSongs.has(key)) {
             uniqueSongs.set(key, {
               title: cleanTitle,
@@ -52,10 +52,10 @@ export const chordService = {
             });
           }
         });
-        
+
         return Array.from(uniqueSongs.values()).slice(0, 10);
       }
-      
+
       return [];
     } catch (error) {
       console.error('Search failed', error);
@@ -69,14 +69,17 @@ export const chordService = {
    */
   async capture(artistSlug: string, songSlug: string): Promise<any> {
     console.log(`Capturing: ${artistSlug}/${songSlug}`);
-    
+
     const targetUrl = `https://www.cifraclub.com.br/${artistSlug}/${songSlug}/`;
 
     // ── CifraClub → ChordPro Converter (shared logic) ─────────────────────
     const isChordToken = (token: string) => {
       if (!token) return false;
-      return /^[A-G][b#]?(m|min|maj|M|dim|aug|sus|add|ø|º|7M|7|6|5|4|2|9|11|13|\+|-|\(|\))*(\\/[A-G][b#]?)?$/.test(token.trim());
+      // Regex super limpo e seguro
+      const chordRegex = /^[A-G][b#]?(m|min|maj|M|dim|aug|sus|add|7M|7|6|5|4|2|9|11|13|\+|-|\(|\))*(\/[A-G][b#]?)?$/;
+      return chordRegex.test(token.trim());
     };
+
 
     const convertToChordPro = (rawText: string): string => {
       const lines = rawText.split('\n');
@@ -126,10 +129,10 @@ export const chordService = {
     };
 
     // ── Proxy list — ordered by reliability ────────────────────────────────
-    // If hosting on Cloudflare Workers, add your worker URL first:
-    // const CF_WORKER = 'https://cifra-proxy.SEU_USUARIO.workers.dev';
+    const CF_WORKER = 'https://cromia-sety.guga-br.workers.dev';
+
     const proxies = [
-      // `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`,        // 🏆 Cloudflare Worker (more reliable, add when deployed)
+      `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`,        // 🏆 Seu Cloudflare Worker
       `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
       `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
       `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
@@ -137,8 +140,8 @@ export const chordService = {
       `https://cors.eu.org/${targetUrl}`,
       `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
       `https://yacdn.org/proxy/${targetUrl}`,
-      `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,  // returns JSON {contents}
     ];
+
 
     for (const proxyUrl of proxies) {
       try {
