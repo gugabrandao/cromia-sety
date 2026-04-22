@@ -1,0 +1,176 @@
+/**
+ * Chord Service
+ * Handles searching and fetching chords from external sources (Cifra Club, etc.)
+ */
+
+export interface SongResult {
+  title: string;
+  artist: string;
+  slug_song: string;
+  slug_artist: string;
+  source: string;
+}
+
+export const chordService = {
+  async search(query: string): Promise<SongResult[]> {
+    const cleanQuery = query.trim();
+    console.log(`Searching for: ${cleanQuery}`);
+    
+    try {
+      // Using iTunes API instead of CifraClub to bypass Cloudflare bot protections
+      const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&entity=song&limit=15`;
+      
+      const response = await fetch(targetUrl);
+      const data = await response.json();
+      
+      if (data && data.results && data.results.length > 0) {
+        const uniqueSongs = new Map<string, SongResult>();
+        
+        data.results.forEach((track: any) => {
+          // Remove version info like (Live), (Remastered) from track name for cleaner slugs
+          let cleanTitle = track.trackName.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
+          let cleanArtist = track.artistName.trim();
+          
+          const normalizeSlug = (str: string) => {
+            return str.toLowerCase()
+              .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+              .replace(/[^a-z0-9]+/g, '-') // replace non-alphanumeric with hyphen
+              .replace(/^-+|-+$/g, ''); // trim hyphens
+          };
+          
+          const slugArtist = normalizeSlug(cleanArtist);
+          const slugSong = normalizeSlug(cleanTitle);
+          const key = `${slugArtist}-${slugSong}`;
+          
+          if (!uniqueSongs.has(key)) {
+            uniqueSongs.set(key, {
+              title: cleanTitle,
+              artist: cleanArtist,
+              slug_artist: slugArtist,
+              slug_song: slugSong,
+              source: 'cifraclub'
+            });
+          }
+        });
+        
+        return Array.from(uniqueSongs.values()).slice(0, 10);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Search failed', error);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch and parse chord content for a specific song
+   * For the demo/MVP, we'll use n8n or a scraping service
+   */
+  async capture(artistSlug: string, songSlug: string): Promise<any> {
+    console.log(`Capturing: ${artistSlug}/${songSlug}`);
+    
+    const targetUrl = `https://www.cifraclub.com.br/${artistSlug}/${songSlug}/`;
+
+    // ── CifraClub → ChordPro Converter (shared logic) ─────────────────────
+    const isChordToken = (token: string) => {
+      if (!token) return false;
+      return /^[A-G][b#]?(m|min|maj|M|dim|aug|sus|add|ø|º|7M|7|6|5|4|2|9|11|13|\+|-|\(|\))*(\\/[A-G][b#]?)?$/.test(token.trim());
+    };
+
+    const convertToChordPro = (rawText: string): string => {
+      const lines = rawText.split('\n');
+      const out: string[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim() === '' || /^\[.*\]$/.test(line.trim())) { out.push(line); continue; }
+        const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(line.trim()) || line.includes('---');
+        const parts = line.split(/(\s+)/);
+        const isChordLine = !isTabLine && parts.some(p => isChordToken(p));
+        if (!isChordLine) { out.push(line); continue; }
+        const next = i + 1 < lines.length ? lines[i + 1] : null;
+        const nextIsChord = next ? next.split(/(\s+)/).some(p => isChordToken(p)) : false;
+        const nextIsTab = next ? (/^[A-Ge]\|[-|0-9a-z ]+/i.test(next.trim()) || next.includes('---')) : false;
+        const nextIsSection = next ? /^\[.*\]$/.test(next.trim()) : false;
+        if (next !== null && !nextIsChord && !nextIsTab && !nextIsSection && next.trim() !== '') {
+          const padded = next.padEnd(line.length, ' ');
+          const positions: { chord: string; index: number }[] = [];
+          const re = /(\S+)/g; let m: RegExpExecArray | null;
+          while ((m = re.exec(line)) !== null) positions.push({ chord: m[1], index: m.index });
+          let merged = ''; let cur = 0;
+          for (const cp of positions) {
+            if (cp.index > cur) { merged += padded.substring(cur, cp.index); cur = cp.index; }
+            merged += `[${cp.chord}]`;
+          }
+          if (cur < padded.length) merged += padded.substring(cur);
+          out.push(merged.trimEnd()); i++;
+        } else {
+          out.push(line.replace(/(\S+)/g, t => isChordToken(t) ? `[${t}]` : t));
+        }
+      }
+      return out.join('\n');
+    };
+
+    const parseHtml = (html: string) => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      let content = doc.querySelector('.cifra-txt pre')?.textContent
+        || doc.querySelector('.cifra_cnt pre')?.textContent
+        || doc.querySelector('pre')?.textContent || '';
+      content = content.trim();
+      const title = doc.querySelector('.t1')?.textContent?.trim()
+        || doc.querySelector('h1')?.textContent?.trim() || songSlug;
+      const artist = doc.querySelector('.t3')?.textContent?.trim()
+        || doc.querySelector('h2')?.textContent?.trim() || artistSlug;
+      return { content, title, artist };
+    };
+
+    // ── Proxy list — ordered by reliability ────────────────────────────────
+    // If hosting on Cloudflare Workers, add your worker URL first:
+    // const CF_WORKER = 'https://cifra-proxy.SEU_USUARIO.workers.dev';
+    const proxies = [
+      // `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`,        // 🏆 Cloudflare Worker (more reliable, add when deployed)
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+      `https://proxy.cors.sh/${targetUrl}`,
+      `https://cors.eu.org/${targetUrl}`,
+      `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
+      `https://yacdn.org/proxy/${targetUrl}`,
+      `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,  // returns JSON {contents}
+    ];
+
+    for (const proxyUrl of proxies) {
+      try {
+        console.log(`Trying: ${proxyUrl}`);
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) continue;
+
+        let html = '';
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const json = await res.json();
+          html = json.contents || json.data || '';
+        } else {
+          html = await res.text();
+        }
+
+        // Verify we got real CifraClub content (not a proxy error page or CF challenge)
+        if (!html || html.includes('Access Denied') || html.includes('cf-browser-verification') || !html.includes('cifra')) continue;
+
+        const { content, title, artist } = parseHtml(html);
+        if (!content) continue;
+
+        console.log(`✅ Success via: ${proxyUrl}`);
+        return { title, artist, content: convertToChordPro(content), original_url: targetUrl };
+
+      } catch (e) {
+        console.warn(`Proxy failed: ${proxyUrl}`, e);
+      }
+    }
+
+    // ── All proxies failed — return structured error (no mock content) ─────
+    throw new Error('ALL_PROXIES_FAILED');
+  }
+};
+
