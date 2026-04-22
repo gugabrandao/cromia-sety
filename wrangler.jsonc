@@ -7,9 +7,9 @@
   },
   "assets": {
     "directory": "./dist",
-    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
+
   "vars": {
     "VITE_SUPABASE_URL": "https://julkjietchtitqwuxmgl.supabase.co",
     "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1bGtqaWV0Y2h0aXRxd3V4bWdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1MjIwNTIsImV4cCI6MjA4NjA5ODA1Mn0.kUnSL3rHzeOk2lV2baW48AWhSwVwl1mxx6a5nXeJyrI"
