@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search as SearchIcon, ArrowLeft, Music2, Plus, Loader2, Guitar, Check } from 'lucide-react';
+import { Search as SearchIcon, Music2, Plus, Loader2, Guitar, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { chordService } from '../services/chordService';
 import type { SongResult } from '../services/chordService';
@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 
 export default function Search() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
+
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);

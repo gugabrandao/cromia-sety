@@ -107,7 +107,7 @@ export default function SongView() {
         setSong(data);
         setEditedContent(data.content_raw || '');
         if (data.settings) {
-          setSettings(prev => ({
+          setSettings((prev: any) => ({
             ...prev,
             ...data.settings,
             title: { ...prev.title, ...(data.settings.title || {}) },
@@ -242,7 +242,7 @@ export default function SongView() {
     const lines = song.content_raw?.split('\n') || [];
 
     // Pass 1: Filter hidden lines
-    const filteredLines = lines.map((line, i) => {
+    const filteredLines = lines.map((line: string, i: number) => {
       const trimmed = line.trim();
       const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(trimmed) || line.includes('---');
       
@@ -262,7 +262,7 @@ export default function SongView() {
         if (/^(H\.N\.|P\.M\.)[\s\.\-]*$/i.test(trimmed)) return null;
 
         // Hide pure chord lines immediately preceding a tab
-        const isPureBracketChordLine = trimmed.length > 0 && trimmed.split(/\s+/).every(p => /^\[[A-G].*?\]$/.test(p));
+        const isPureBracketChordLine = trimmed.length > 0 && trimmed.split(/\s+/).every((p: string) => /^\[[A-G].*?\]$/.test(p));
         if (isPureBracketChordLine) {
           let nextNonEmptyLine = '';
           for (let j = i + 1; j < lines.length; j++) {
@@ -277,7 +277,7 @@ export default function SongView() {
       }
 
       return line;
-    }).filter(l => l !== null) as string[];
+    }).filter((l: string | null) => l !== null) as string[];
 
     // Pass 2: Collapse consecutive empty lines
     const collapsedLines = filteredLines.filter((line, i) => {
@@ -364,7 +364,7 @@ export default function SongView() {
   };
 
   const updateSetting = (element: string, key: string, value: any) => {
-    setSettings(prev => ({
+    setSettings((prev: any) => ({
       ...prev,
       [element]: typeof prev[element as keyof typeof prev] === 'object'
         ? { ...(prev[element as keyof typeof prev] as any), [key]: value }
@@ -667,7 +667,7 @@ export default function SongView() {
                 const lines = song.content_raw?.split('\n') || [];
 
                 // Pass 1: Filter hidden lines
-                const filteredLines = lines.map((line, i) => {
+                const filteredLines = lines.map((line: string, i: number) => {
                   const trimmed = line.trim();
                   const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(trimmed) || line.includes('---');
                   
@@ -687,7 +687,7 @@ export default function SongView() {
                     if (/^(H\.N\.|P\.M\.)[\s\.\-]*$/i.test(trimmed)) return null;
 
                     // Hide pure chord lines immediately preceding a tab
-                    const isPureBracketChordLine = trimmed.length > 0 && trimmed.split(/\s+/).every(p => /^\[[A-G].*?\]$/.test(p));
+                    const isPureBracketChordLine = trimmed.length > 0 && trimmed.split(/\s+/).every((p: string) => /^\[[A-G].*?\]$/.test(p));
                     if (isPureBracketChordLine) {
                       let nextNonEmptyLine = '';
                       for (let j = i + 1; j < lines.length; j++) {
@@ -702,17 +702,17 @@ export default function SongView() {
                   }
 
                   return line;
-                }).filter(l => l !== null) as string[];
+                }).filter((l: string | null) => l !== null) as string[];
 
                 // Pass 2: Collapse consecutive empty lines
-                const collapsedLines = filteredLines.filter((line, i) => {
+                const collapsedLines = filteredLines.filter((line: string, i: number) => {
                   if (line.trim() === '' && i > 0 && filteredLines[i - 1].trim() === '') return false;
                   return true;
                 });
 
                 return (
                   <>
-                    {collapsedLines.map((line, i) => {
+                    {collapsedLines.map((line: string, i: number) => {
                       const displayLine = line;
                       const trimmed = displayLine.trim();
                       const isTabLine = /^[A-Ge]\|[-|0-9a-z ]+/i.test(trimmed) || displayLine.includes('---');

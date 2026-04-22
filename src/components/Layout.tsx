@@ -13,7 +13,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { t, i18n } = useTranslation();
-  const { theme, toggleTheme, isDarkMode } = useTheme();
+  const { toggleTheme, isDarkMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
