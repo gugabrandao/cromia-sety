@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Settings, Play, Pause,
-  Loader2, Minus, Plus, Check, Pencil, X, Sun, Moon, Music2, Guitar,
-  ChevronLeft, ChevronRight, Undo2, Redo2, RotateCcw, PlusCircle, Sparkles
+  Loader2, Minus, Plus, Check, Pencil, X, Sun, Moon, Music2,
+  ChevronLeft, ChevronRight, Undo2, Redo2, PlusCircle, Sparkles
 } from 'lucide-react';
 
 import { supabase } from '../lib/supabase';
@@ -95,8 +95,6 @@ export default function SongView() {
   const [song, setSong] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isScrolling, setIsScrolling] = useState(false);
-  const [showSpeedToast, setShowSpeedToast] = useState(false);
-  const speedToastTimeout = useRef<any>(null);
   const scrollRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number | undefined>(undefined);
   const [currentTranspose, setTranspose] = useState(0);
@@ -187,14 +185,14 @@ export default function SongView() {
 
   const handleFetchMetadata = async () => {
     if (!song.title || !song.artist) return;
-    
+
     // Simple feedback
     const originalTitle = document.title;
     document.title = "Buscando dados...";
-    
+
     try {
       const data = await fetchSongMetadata(song.title, song.artist);
-      
+
       if (data) {
         setSong((prev: any) => ({
           ...prev,
@@ -806,7 +804,7 @@ export default function SongView() {
               </div>
 
               {!isDarkMode && (
-                <button 
+                <button
                   onClick={() => updateGlobalSetting('isWarmWhite', !settings.isWarmWhite)}
                   className={`w-full mb-8 p-4 rounded-2xl border transition-all flex items-center justify-between ${settings.isWarmWhite ? 'bg-brand-purple/10 border-brand-purple/30' : 'bg-foreground/5 border-transparent'}`}
                 >
@@ -887,7 +885,7 @@ export default function SongView() {
                 <button onClick={handleSettingsUndo} disabled={settingsHistory.length === 0} className="flex-1 py-4 bg-brand-purple/10 text-brand-accent rounded-2xl font-bold flex items-center justify-center gap-2"><Undo2 className="w-4 h-4" /> Desfazer</button>
                 <button onClick={handleSettingsRedo} disabled={settingsRedoHistory.length === 0} className="flex-1 py-4 bg-brand-purple/10 text-brand-accent rounded-2xl font-bold flex items-center justify-center gap-2"><Redo2 className="w-4 h-4" /> Refazer</button>
               </div>
-              <button onClick={() => setIsSettingsOpen(false)} className="w-full py-4 bg-brand-purple text-white rounded-2xl font-bold">Pronto</button>
+              <button onClick={() => setIsSettingsOpen(false)} className="w-full py-4 bg-brand-purple text-white rounded-2xl font-bold">OK</button>
             </div>
           </div>
         </div>
@@ -945,7 +943,7 @@ export default function SongView() {
             <div key={revision} className={`leading-relaxed ${isEditing ? 'editing-mode cursor-text' : ''}`}>
               {(() => {
                 const lines = (isEditing ? editedContent : (song.content_raw || '')).split('\n');
-                const mappedLines = lines.map((text, idx) => ({ text, originalIdx: idx }));
+                const mappedLines = lines.map((text: string, idx: number) => ({ text, originalIdx: idx }));
 
                 let filteredMapped = [...mappedLines];
                 if (!settings.showTabs && !isEditing) {
@@ -957,7 +955,7 @@ export default function SongView() {
                       if (currentBlock.length > 0) {
                         const blockContent = currentBlock.map(idx => mappedLines[idx].text);
                         const hasTab = blockContent.some(l => /^[A-Ge]\|[-|0-9a-z ]+/i.test(l.trim()) || l.includes('---'));
-                        const hasLyr = blockContent.some(l => /\[.*?\]/.test(l) && l.trim().split(/\[.*?\]/g).some(p => p.trim().length > 0));
+                        const hasLyr = blockContent.some(l => /\[.*?\]/.test(l) && l.trim().split(/\[.*?\]/g).some((p: string) => p.trim().length > 0));
                         if (hasTab && !hasLyr) currentBlock.forEach(idx => { filteredMapped[idx] = null; });
                       }
                       currentBlock = [];
