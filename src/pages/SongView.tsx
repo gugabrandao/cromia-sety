@@ -921,7 +921,7 @@ export default function SongView() {
                   </div>
                 )}
                 {song.observations && (
-                  <div className={`mt-0 bg-white/10 pl-6 pr-2 ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}>
+                  <div className={`mt-0 ${isDarkMode ? 'bg-white/10' : 'bg-foreground/10'} pl-4 pr-4 w-fit ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}>
                     {song.observations}
                   </div>
                 )}
