@@ -16,6 +16,8 @@ export default function Search() {
   const [addedSongs, setAddedSongs] = useState<Set<string>>(new Set());
   const [showToast, setShowToast] = useState<string | null>(null);
   const [results, setResults] = useState<SongResult[]>([]);
+  const [previewSong, setPreviewSong] = useState<SongResult | null>(null);
+  const [isSimplified, setIsSimplified] = useState(false);
 
   const handleSearch = async (searchQuery: string = query) => {
     if (!searchQuery.trim()) {
@@ -52,12 +54,12 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const handleAddSong = async (song: SongResult) => {
+  const handleAddSong = async (song: SongResult, simplified: boolean = false) => {
     const songId = `${song.slug_artist}-${song.slug_song}`;
     setIsAdding(songId);
     try {
       // 1. Capture content
-      const captured = await chordService.capture(song.slug_artist, song.slug_song);
+      const captured = await chordService.capture(song.slug_artist, song.slug_song, simplified);
       
       // 2. Save to Supabase
       const { data: { user } } = await supabase.auth.getUser();
@@ -65,7 +67,7 @@ export default function Search() {
 
       const { error } = await supabase.from('musicbox_setlist').insert({
         user_id: userId,
-        title: captured.title,
+        title: simplified ? `${captured.title} (Simplificada)` : captured.title,
         artist: captured.artist,
         slug_artist: song.slug_artist,
         slug_song: song.slug_song,
@@ -165,7 +167,7 @@ export default function Search() {
                     </div>
                   </div>
                   <button 
-                    onClick={() => handleAddSong(song)}
+                    onClick={() => { setPreviewSong(song); setIsSimplified(false); }}
                     disabled={isAdding === `${song.slug_artist}-${song.slug_song}` || addedSongs.has(`${song.slug_artist}-${song.slug_song}`)}
                     className={`p-3 rounded-xl transition-all shadow-lg ${
                       addedSongs.has(`${song.slug_artist}-${song.slug_song}`)
@@ -195,6 +197,54 @@ export default function Search() {
           )}
         </div>
       </main>
+      {/* Preview Modal */}
+      {previewSong && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in" onClick={() => setPreviewSong(null)}>
+          <div className="glass w-full max-w-md rounded-3xl border border-foreground/10 shadow-2xl p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-4 mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-foreground/5 flex items-center justify-center shrink-0">
+                {previewSong.artwork_url ? <img src={previewSong.artwork_url} className="w-full h-full object-cover rounded-2xl" /> : <Guitar className="w-8 h-8 text-brand-accent" />}
+              </div>
+              <div>
+                <h2 className="text-xl font-black leading-tight">{previewSong.title}</h2>
+                <p className="text-foreground/50 font-medium">{previewSong.artist}</p>
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/40 mb-3">Versão da Cifra</h3>
+              <div className="flex bg-foreground/5 p-1 rounded-xl">
+                <button 
+                  onClick={() => setIsSimplified(false)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${!isSimplified ? 'bg-background shadow-md text-foreground' : 'text-foreground/50 hover:text-foreground'}`}
+                >
+                  Original
+                </button>
+                <button 
+                  onClick={() => setIsSimplified(true)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${isSimplified ? 'bg-background shadow-md text-brand-purple' : 'text-foreground/50 hover:text-foreground'}`}
+                >
+                  Simplificada
+                </button>
+              </div>
+              {isSimplified && <p className="text-xs text-brand-purple/70 mt-3 text-center px-4">Nosso robô tentará importar a versão simplificada se ela estiver disponível.</p>}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setPreviewSong(null)} className="flex-1 py-3 rounded-xl font-bold text-foreground/50 hover:bg-foreground/5 transition-colors">
+                Cancelar
+              </button>
+              <button 
+                onClick={() => { handleAddSong(previewSong, isSimplified); setPreviewSong(null); }}
+                className="flex-[2] py-3 rounded-xl font-bold bg-brand-purple text-white hover:bg-brand-accent transition-colors shadow-lg shadow-brand-purple/20 flex items-center justify-center gap-2"
+              >
+                <Music2 className="w-4 h-4" /> Importar Cifra
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Premium Toast Notification */}
       {showToast && (
         <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-8 duration-300">

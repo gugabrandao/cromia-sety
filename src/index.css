@@ -6,22 +6,48 @@
 @tailwind utilities;
 
 /* Explicit Font Classes */
-.font-inter { font-family: 'Inter', sans-serif; }
-.font-outfit { font-family: 'Outfit', sans-serif; }
-.font-mono-custom { font-family: 'JetBrains Mono', monospace; }
-.font-times { font-family: 'Times New Roman', Times, serif; }
-.font-georgia { font-family: Georgia, serif; }
-.font-courier { font-family: 'Courier New', Courier, monospace; }
-.font-fira { font-family: 'Fira Code', monospace; }
-.font-cascadia { font-family: 'Cascadia Code', 'Cascadia Mono', monospace; }
-.font-lucida { font-family: 'Lucida Console', 'Courier New', monospace; }
+.font-inter {
+  font-family: 'Inter', sans-serif;
+}
+
+.font-outfit {
+  font-family: 'Outfit', sans-serif;
+}
+
+.font-mono-custom {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.font-times {
+  font-family: 'Times New Roman', Times, serif;
+}
+
+.font-georgia {
+  font-family: Georgia, serif;
+}
+
+.font-courier {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.font-fira {
+  font-family: 'Fira Code', monospace;
+}
+
+.font-cascadia {
+  font-family: 'Cascadia Code', 'Cascadia Mono', monospace;
+}
+
+.font-lucida {
+  font-family: 'Lucida Console', 'Courier New', monospace;
+}
 
 @layer base {
   :root {
     --brand-purple: #a855f7;
     --brand-dark: #0f172a;
     --brand-accent: #f472b6;
-    
+
     /* Default (Dark) */
     --background: 240 19% 8%;
     --foreground: 210 20% 98%;
@@ -36,6 +62,10 @@
     --card: 0 0% 100%;
     --card-foreground: 240 19% 8%;
     --border: 240 19% 90%;
+  }
+
+  .light.warm {
+    --background: 50 100% 96%;
   }
 
   .dark {
@@ -67,7 +97,7 @@
   .glass {
     @apply bg-foreground/[0.03] backdrop-blur-md border border-foreground/[0.05] transition-all;
   }
-  
+
   .glass-card {
     @apply bg-foreground/[0.02] backdrop-blur-xl border border-foreground/[0.05] shadow-2xl transition-all;
   }

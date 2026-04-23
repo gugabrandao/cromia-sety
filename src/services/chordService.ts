@@ -85,10 +85,11 @@ export const chordService = {
    * Fetch and parse chord content for a specific song
    * For the demo/MVP, we'll use n8n or a scraping service
    */
-  async capture(artistSlug: string, songSlug: string): Promise<any> {
-    console.log(`Capturing: ${artistSlug}/${songSlug}`);
+  async capture(artistSlug: string, songSlug: string, isSimplified: boolean = false): Promise<any> {
+    console.log(`Capturing: ${artistSlug}/${songSlug} (Simplified: ${isSimplified})`);
 
-    const targetUrl = `https://www.cifraclub.com.br/${artistSlug}/${songSlug}/`;
+    const suffix = isSimplified ? 'simplificada.html' : '';
+    const targetUrl = `https://www.cifraclub.com.br/${artistSlug}/${songSlug}/${suffix}`;
 
     // ── CifraClub → ChordPro Converter (shared logic) ─────────────────────
     const isChordToken = (token: string) => {
