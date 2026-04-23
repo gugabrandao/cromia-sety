@@ -119,29 +119,29 @@ export default function SongView() {
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('musicbox_global_settings');
     const defaults = {
-      title: { size: 60, color: '#1a1a1a', font: 'font-outfit' },
-      artist: { size: 24, color: '#f97316', font: 'font-inter' },
-      observations: { size: 16, color: '#4b5563', font: 'font-inter', italic: true },
-      sections: { size: 20, color: '#f97316', font: 'font-outfit', italic: false, bold: true },
-      chords: { size: 18, color: '#f97316', font: 'font-mono-custom' },
-      lyrics: { size: 18, color: '#1a1a1a', font: 'font-inter' },
-      tabs: { size: 14, color: '#1a1a1a', font: 'font-courier' },
-      metadata: { size: 10, color: '#6b7280', font: 'font-inter', bold: true },
-      observationsBg: '#f97316',
-      headerGap: -4,
-      chordLyricGap: 0,
-      lineGap: 12,
-      sectionGapTop: 24,
-      sectionGapBottom: 8,
+      title: { size: 60, color: '#fffceb', font: 'font-outfit' },
+      artist: { size: 36, color: '#f07400', font: 'font-inter' },
+      observations: { size: 33, color: '#bd5b00', font: 'font-outfit', italic: false },
+      sections: { size: 20, color: '#f07400', font: 'font-mono-custom', italic: false, bold: false },
+      chords: { size: 20, color: '#ff8800', font: 'font-mono-custom' },
+      lyrics: { size: 22, color: '#ffffff', font: 'font-outfit' },
+      tabs: { size: 17, color: '#ffffff', font: 'font-fira' },
+      metadata: { size: 15, color: '#ffffff', font: 'font-inter', bold: true },
+      observationsBg: '#ff8800',
+      headerGap: -2,
+      chordLyricGap: -7,
+      lineGap: 0,
+      sectionGapTop: 0,
+      sectionGapBottom: 7,
       showTabs: true,
       showSections: true,
       showMetadata: true,
       showArtwork: true,
-      isDarkMode: true,
+      isDarkMode: false,
       scrollSpeed: 5,
       useFlats: false,
-      metadataGapTop: 4,
-      isWarmWhite: true
+      metadataGapTop: 8,
+      isWarmWhite: false
     };
     return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
   });
@@ -786,10 +786,10 @@ export default function SongView() {
           </div>
           {isEditing ? (
             <div className="flex items-center gap-1">
-              <button 
-                onClick={handleFetchMetadata} 
+              <button
+                onClick={handleFetchMetadata}
                 disabled={isFetchingMetadata}
-                className={`p-2.5 rounded-xl transition-all flex items-center gap-2 mr-2 ${isFetchingMetadata ? 'bg-brand-purple/20 text-brand-accent animate-pulse' : 'hover:bg-brand-purple/10 text-brand-accent'}`} 
+                className={`p-2.5 rounded-xl transition-all flex items-center gap-2 mr-2 ${isFetchingMetadata ? 'bg-brand-purple/20 text-brand-accent animate-pulse' : 'hover:bg-brand-purple/10 text-brand-accent'}`}
                 title="Auto-Info (BPM/Tom)"
               >
                 {isFetchingMetadata ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
