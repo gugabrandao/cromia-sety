@@ -118,7 +118,7 @@ i18n
           search_no_results: 'Nenhuma música encontrada para',
           search_button: 'Buscar',
           search_results_title: 'Resultados da Busca',
-          sync_success: 'Sincronizado com Supabase',
+          sync_success: 'Sincronizado com o servidor!',
           added_to_library: 'adicionada à biblioteca!',
           settings_title: 'Configurações',
           tablatures: 'Tablaturas',

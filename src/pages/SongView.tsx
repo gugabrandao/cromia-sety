@@ -901,7 +901,7 @@ export default function SongView() {
                 value={song.observations || ''}
                 onChange={(e) => setSong({ ...song, observations: e.target.value })}
                 placeholder={t('observations_placeholder')}
-                className="w-full bg-transparent border-b border-white/10 outline-none text-sm opacity-60 mt-2 italic resize-none"
+                className="w-full bg-transparent border-b border-white/10 outline-none text-sm opacity-60 italic resize-none"
                 rows={2}
               />
             </div>
@@ -921,7 +921,7 @@ export default function SongView() {
                   </div>
                 )}
                 {song.observations && (
-                  <div className={`mt-4 ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}>
+                  <div className={`mt-0 bg-white/10 pl-6 pr-2 ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}>
                     {song.observations}
                   </div>
                 )}
