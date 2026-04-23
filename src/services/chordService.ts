@@ -89,7 +89,6 @@ export const chordService = {
     console.log(`Capturing: ${artistSlug}/${songSlug} (Simplified: ${isSimplified})`);
 
     const suffix = isSimplified ? 'simplificada.html' : '';
-    const targetUrl = `https://www.cifraclub.com.br/${artistSlug}/${songSlug}/${suffix}`;
 
     // ── CifraClub → ChordPro Converter (shared logic) ─────────────────────
     const isChordToken = (token: string) => {
