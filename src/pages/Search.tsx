@@ -5,6 +5,7 @@ import { chordService } from '../services/chordService';
 
 import type { SongResult } from '../services/chordService';
 import { supabase } from '../lib/supabase';
+import { fetchSongMetadata } from '../services/spotifyService';
 
 export default function Search() {
   const { t } = useTranslation();
@@ -61,7 +62,15 @@ export default function Search() {
       // 1. Capture content
       const captured = await chordService.capture(song.slug_artist, song.slug_song, simplified);
       
-      // 2. Save to Supabase
+      // 2. Fetch extra metadata from Spotify (Optional/Resilient)
+      let spotifyData = null;
+      try {
+        spotifyData = await fetchSongMetadata(captured.title, captured.artist);
+      } catch (err) {
+        console.error('Spotify fetch failed, proceeding with basic info:', err);
+      }
+
+      // 3. Save to Supabase
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || '00000000-0000-0000-0000-000000000000';
 
@@ -73,11 +82,14 @@ export default function Search() {
         slug_song: song.slug_song,
         source: 'cifraclub',
         source_url: captured.original_url,
-        artwork_url: song.artwork_url,
-        album_name: song.album_name,
+        artwork_url: spotifyData?.artwork_url || song.artwork_url,
+        album_name: spotifyData?.album_name || song.album_name,
         duration_ms: song.duration_ms,
         genre: song.genre,
-        release_date: song.release_date,
+        release_date: spotifyData?.release_date || song.release_date,
+        bpm: spotifyData?.bpm,
+        original_key: spotifyData?.key,
+        time_signature: spotifyData?.time_signature,
         content_raw: captured.content,
         fetch_status: 'success'
       } as any);

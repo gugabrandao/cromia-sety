@@ -149,45 +149,49 @@ export const chordService = {
 
     // ── Proxy list — ordered by reliability ────────────────────────────────
     const CF_WORKER = 'https://sety-proxy.guga-br.workers.dev';
-
-    const proxies = [
-      `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`,        // 🏆 Seu Cloudflare Worker
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-      `https://proxy.cors.sh/${targetUrl}`,
-      `https://cors.eu.org/${targetUrl}`,
-      `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
-      `https://yacdn.org/proxy/${targetUrl}`,
+    
+    // Generate slug variations to be more resilient
+    const slugVariations = [
+      songSlug,
+      songSlug.replace(/-o-/, '-o'), // sweet-child-o-mine -> sweet-child-omine
+      songSlug.replace(/-/g, ''),    // sweet-child-o-mine -> sweetchildomine
     ];
 
+    for (const currentSlug of slugVariations) {
+      const currentUrl = `https://www.cifraclub.com.br/${artistSlug}/${currentSlug}/${suffix}`;
+      console.log(`Trying variation: ${currentSlug}`);
 
-    for (const proxyUrl of proxies) {
-      try {
-        console.log(`Trying: ${proxyUrl}`);
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) continue;
+      const proxies = [
+        `${CF_WORKER}?url=${encodeURIComponent(currentUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(currentUrl)}`,
+        `https://corsproxy.io/?${encodeURIComponent(currentUrl)}`,
+      ];
 
-        let html = '';
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const json = await res.json();
-          html = json.contents || json.data || '';
-        } else {
-          html = await res.text();
+      for (const proxyUrl of proxies) {
+        try {
+          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) });
+          if (!res.ok) continue;
+
+          let html = '';
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const json = await res.json();
+            html = json.contents || json.data || '';
+          } else {
+            html = await res.text();
+          }
+
+          if (!html || html.includes('Access Denied') || !html.includes('cifra')) continue;
+
+          const { content, title, artist } = parseHtml(html);
+          if (!content) continue;
+
+          console.log(`✅ Success via: ${proxyUrl} with slug: ${currentSlug}`);
+          return { title, artist, content: convertToChordPro(content), original_url: currentUrl };
+
+        } catch (e) {
+          // Silent fail for proxy, try next
         }
-
-        // Verify we got real CifraClub content (not a proxy error page or CF challenge)
-        if (!html || html.includes('Access Denied') || html.includes('cf-browser-verification') || !html.includes('cifra')) continue;
-
-        const { content, title, artist } = parseHtml(html);
-        if (!content) continue;
-
-        console.log(`✅ Success via: ${proxyUrl}`);
-        return { title, artist, content: convertToChordPro(content), original_url: targetUrl };
-
-      } catch (e) {
-        console.warn(`Proxy failed: ${proxyUrl}`, e);
       }
     }
 

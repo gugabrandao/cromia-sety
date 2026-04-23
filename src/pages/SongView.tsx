@@ -110,6 +110,7 @@ export default function SongView() {
   const [settingsRedoHistory, setSettingsRedoHistory] = useState<any[]>([]);
   const [revision, setRevision] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, lineIdx: number, isChorus: boolean, charOffset: number } | null>(null);
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
 
   const sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -190,27 +191,40 @@ export default function SongView() {
     const originalTitle = document.title;
     document.title = "Buscando dados...";
 
+    setIsFetchingMetadata(true);
     try {
       const data = await fetchSongMetadata(song.title, song.artist);
 
       if (data) {
-        setSong((prev: any) => ({
-          ...prev,
-          bpm: data.bpm || prev.bpm,
-          key: data.key || prev.key,
-          time_signature: data.time_signature || prev.time_signature,
-          artwork_url: data.artwork_url || prev.artwork_url,
-          album_name: data.album_name || prev.album_name,
-          release_date: data.release_date || prev.release_date,
-        }));
-        alert("Dados encontrados e atualizados!");
+        const updatedFields = {
+          bpm: data.bpm || song.bpm,
+          original_key: data.key || song.original_key,
+          time_signature: data.time_signature || song.time_signature,
+          artwork_url: data.artwork_url || song.artwork_url,
+          album_name: data.album_name || song.album_name,
+          release_date: data.release_date || song.release_date,
+        };
+
+        // Update local state
+        setSong((prev: any) => ({ ...prev, ...updatedFields }));
+
+        // Auto-save to Supabase immediately using the correct column name
+        const { error } = await (supabase.from('musicbox_setlist') as any)
+          .update(updatedFields)
+          .eq('id', id);
+
+        if (error) throw error;
+
+        alert("Dados musicais (BPM/Tom) atualizados e salvos com sucesso!");
       } else {
-        alert("Não encontramos dados para esta música no Spotify.");
+        alert("Não conseguimos encontrar dados automáticos para esta música. Você pode preenchê-los manualmente se desejar.");
       }
     } catch (error) {
-      alert("Erro ao buscar dados no Spotify. Verifique suas credenciais.");
+      console.error('Metadata error:', error);
+      alert("Erro ao consultar a base de dados musical. Tente novamente em instantes.");
     } finally {
       document.title = originalTitle;
+      setIsFetchingMetadata(false);
     }
   };
 
@@ -772,7 +786,17 @@ export default function SongView() {
           </div>
           {isEditing ? (
             <div className="flex items-center gap-1">
-              <button onClick={handleFetchMetadata} className="p-2.5 rounded-xl hover:bg-brand-purple/10 text-brand-accent transition-all flex items-center gap-2 mr-2" title="Buscar dados no Spotify"><Sparkles className="w-5 h-5" /> <span className="text-xs font-bold hidden md:inline">Auto-Info</span></button>
+              <button 
+                onClick={handleFetchMetadata} 
+                disabled={isFetchingMetadata}
+                className={`p-2.5 rounded-xl transition-all flex items-center gap-2 mr-2 ${isFetchingMetadata ? 'bg-brand-purple/20 text-brand-accent animate-pulse' : 'hover:bg-brand-purple/10 text-brand-accent'}`} 
+                title="Auto-Info (BPM/Tom)"
+              >
+                {isFetchingMetadata ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                <span className="text-xs font-bold hidden md:inline">
+                  {isFetchingMetadata ? 'Buscando...' : 'Auto-Info'}
+                </span>
+              </button>
               <button onClick={handleUndo} disabled={history.length === 0} className={`p-2 rounded-xl transition-all ${history.length === 0 ? 'opacity-20' : 'hover:bg-foreground/5 text-brand-accent'}`}><Undo2 className="w-5 h-5" /></button>
               <button onClick={handleRedo} disabled={redoHistory.length === 0} className={`p-2 rounded-xl transition-all ${redoHistory.length === 0 ? 'opacity-20' : 'hover:bg-foreground/5 text-brand-accent'}`}><Redo2 className="w-5 h-5" /></button>
               <button onClick={handleSaveEdit} className="px-6 py-2 bg-green-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 hover:bg-green-600 transition-all">Salvar</button>
@@ -914,7 +938,7 @@ export default function SongView() {
                 {settings.showMetadata && (song.genre || song.release_date || song.album_name || song.bpm || song.key) && (
                   <div className={`flex flex-wrap gap-2 ${settings.metadata?.font || 'font-inter'} ${settings.metadata?.bold ? 'font-bold' : ''}`} style={{ fontSize: `${settings.metadata?.size || 10}px`, color: getEffectiveColor(settings.metadata?.color || '#ffffff'), marginTop: `${settings.metadataGapTop ?? 8}px` }}>
                     {song.bpm && <span className="px-2 py-0.5 rounded-md bg-brand-purple/20 text-brand-accent font-bold">{song.bpm} BPM</span>}
-                    {song.key && <span className="px-2 py-0.5 rounded-md bg-brand-purple/20 text-brand-accent font-bold">{song.key}</span>}
+                    {song.original_key && <span className="px-2 py-0.5 rounded-md bg-brand-purple/20 text-brand-accent font-bold">{song.original_key}</span>}
                     {song.genre && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60">{song.genre}</span>}
                     {song.release_date && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60">{new Date(song.release_date).getFullYear()}</span>}
                     {song.album_name && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60 line-clamp-1">{song.album_name}</span>}
