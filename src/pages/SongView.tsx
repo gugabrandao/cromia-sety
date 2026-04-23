@@ -208,7 +208,7 @@ export default function SongView() {
         // Update local state
         setSong((prev: any) => ({ ...prev, ...updatedFields }));
 
-        // Auto-save to Supabase immediately using the correct column name
+        // Auto-save to Supabase directly to columns
         const { error } = await (supabase.from('musicbox_setlist') as any)
           .update(updatedFields)
           .eq('id', id);
