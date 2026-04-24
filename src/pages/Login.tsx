@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Music2, Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
 import setyLogo from '../assets/sety logo branca.svg';
 
 export default function Login() {

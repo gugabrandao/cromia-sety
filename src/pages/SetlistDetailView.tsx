@@ -121,12 +121,13 @@ export default function SetlistDetailView() {
   }, [id]);
 
   async function fetchSetlistData() {
+    if (!id) return;
     setIsLoading(true);
     // 1. Fetch Setlist details
     const { data: setlistData } = await supabase
       .from('cromiasety_setlists')
       .select('*')
-      .eq('id', id)
+      .eq('id', id!)
       .single();
 
     if (setlistData) setSetlist(setlistData);
@@ -143,7 +144,7 @@ export default function SetlistDetailView() {
         song_id,
         song:song_id (id, title, artist, original_key, bpm, observations, artwork_url, content_html, duration_ms, tempo_performance_ms, bpm_performance, tom_performance)
       `)
-      .eq('setlist_id', id)
+      .eq('setlist_id', id!)
       .order('position', { ascending: true });
 
     if (songsData) {

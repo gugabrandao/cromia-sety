@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Mic2, LayoutDashboard, Settings, User,
-  Search as SearchIcon, Sun, Moon, Globe, ListMusic, LogOut
+  Sun, Moon, Globe, ListMusic, LogOut
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';

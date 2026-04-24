@@ -83,12 +83,12 @@ export default function SetlistView() {
     if (!confirm('Tem certeza que deseja remover esta música do seu repertório?')) return;
 
     try {
-      const { error } = await supabase
+      const { error: _error } = await supabase
         .from('cromiasety_setlist')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (_error) throw _error;
       setSongs(prev => prev.filter(s => s.id !== id));
     } catch (err) {
       console.error('Error deleting song:', err);
