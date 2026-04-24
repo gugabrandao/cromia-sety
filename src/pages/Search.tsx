@@ -65,7 +65,8 @@ export default function Search() {
       // 2. Fetch extra metadata from Spotify (Optional/Resilient)
       let spotifyData = null;
       try {
-        spotifyData = await fetchSongMetadata(captured.title, captured.artist);
+        // Passa "true" para o fastMode: Traz a capa imediatamente, pula a IA
+        spotifyData = await fetchSongMetadata(captured.title, captured.artist, true);
       } catch (err) {
         console.error('Spotify fetch failed, proceeding with basic info:', err);
       }
@@ -74,7 +75,7 @@ export default function Search() {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || '00000000-0000-0000-0000-000000000000';
 
-      const { error } = await supabase.from('musicbox_setlist').insert({
+      const { error } = await supabase.from('cromiasety_setlist').insert({
         user_id: userId,
         title: simplified ? `${captured.title} (Simplificada)` : captured.title,
         artist: captured.artist,

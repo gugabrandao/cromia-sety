@@ -9,7 +9,7 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      musicbox_setlist: {
+      cromiasety_setlist: {
         Row: {
           id: string
           user_id: string
@@ -98,7 +98,7 @@ export interface Database {
           key?: string | null
         }
       }
-      musicbox_setlists: {
+      cromiasety_setlists: {
         Row: {
           id: string
           user_id: string
@@ -163,6 +163,50 @@ export interface Database {
           updated_at?: string
         }
       }
+      cromiasety_setlist_songs: {
+        Row: {
+          id: string
+          setlist_id: string
+          song_id: string | null
+          position: number
+          is_interval: boolean
+          interval_name: string | null
+          interval_duration: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          setlist_id: string
+          song_id?: string | null
+          position?: number
+          is_interval?: boolean
+          interval_name?: string | null
+          interval_duration?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          setlist_id?: string
+          song_id?: string | null
+          position?: number
+          is_interval?: boolean
+          interval_name?: string | null
+          interval_duration?: number | null
+          created_at?: string
+        }
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

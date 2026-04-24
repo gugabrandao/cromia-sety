@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Settings, Play, Pause,
@@ -88,8 +89,52 @@ function EditableLine({ line, originalIdx, isTabLine, isEditing, settings, getEf
 export default function SongView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toggleTheme, isDarkMode } = useTheme();
   const { t } = useTranslation();
+
+  // --- Contexto de Setlist ---
+  const queryParams = new URLSearchParams(location.search);
+  const setlistId = queryParams.get('setlistId');
+  const [setlistSongs, setSetlistSongs] = useState<any[]>([]);
+  const [currentSetlistIndex, setCurrentSetlistIndex] = useState(-1);
+
+  useEffect(() => {
+    if (setlistId) {
+      const fetchSetlistSongs = async () => {
+        const { data } = await supabase
+          .from('cromiasety_setlist_songs')
+          .select('id, song_id, position, is_interval, interval_name, interval_duration')
+          .eq('setlist_id', setlistId)
+          .order('position', { ascending: true });
+        
+        if (data) {
+          const formatted = (data as any[]).map(item => ({
+            ...item,
+            navId: item.is_interval ? `interval_${item.id}` : item.song_id
+          }));
+          setSetlistSongs(formatted);
+          const index = formatted.findIndex(s => s.navId === id);
+          setCurrentSetlistIndex(index);
+        }
+      };
+      fetchSetlistSongs();
+    }
+  }, [setlistId, id]);
+
+  const handleNextInSetlist = () => {
+    if (currentSetlistIndex < setlistSongs.length - 1) {
+      const nextId = (setlistSongs[currentSetlistIndex + 1] as any).navId;
+      navigate(`/song/${nextId}?setlistId=${setlistId}`);
+    }
+  };
+
+  const handlePrevInSetlist = () => {
+    if (currentSetlistIndex > 0) {
+      const prevId = (setlistSongs[currentSetlistIndex - 1] as any).navId;
+      navigate(`/song/${prevId}?setlistId=${setlistId}`);
+    }
+  };
 
   // --- 1. States ---
   const [song, setSong] = useState<any>(null);
@@ -203,13 +248,17 @@ export default function SongView() {
           artwork_url: data.artwork_url || song.artwork_url,
           album_name: data.album_name || song.album_name,
           release_date: data.release_date || song.release_date,
+          // Concatena o resumo da IA nas observações existentes, se houver
+          observations: data.ai_summary
+            ? `${song.observations ? song.observations + '\n\n' : ''}🤖 Análise da IA:\n${data.ai_summary}`
+            : song.observations,
         };
 
         // Update local state
         setSong((prev: any) => ({ ...prev, ...updatedFields }));
 
         // Auto-save to Supabase directly to columns
-        const { error } = await (supabase.from('musicbox_setlist') as any)
+        const { error } = await (supabase.from('cromiasety_setlist') as any)
           .update(updatedFields)
           .eq('id', id);
 
@@ -628,8 +677,13 @@ export default function SongView() {
   useEffect(() => {
     async function fetchSong() {
       if (!id) return;
+      if (id.startsWith('interval_')) {
+        setLoading(false);
+        setSong({ is_interval: true });
+        return;
+      }
       setLoading(true);
-      const { data, error } = await (supabase.from('musicbox_setlist') as any).select('*').eq('id', id).single();
+      const { data, error } = await (supabase.from('cromiasety_setlist') as any).select('*').eq('id', id).single();
       if (data) {
         setSong(data);
         setEditedContent(data.content_raw || '');
@@ -660,7 +714,7 @@ export default function SongView() {
   useEffect(() => {
     if (!song || !id) return;
     const timeout = setTimeout(async () => {
-      try { await (supabase.from('musicbox_setlist') as any).update({ settings }).eq('id', id); } catch (err) { console.error('Auto-save settings error:', err); }
+      try { await (supabase.from('cromiasety_setlist') as any).update({ settings }).eq('id', id); } catch (err) { console.error('Auto-save settings error:', err); }
     }, 1000);
     return () => clearTimeout(timeout);
   }, [settings, id, song]);
@@ -690,7 +744,7 @@ export default function SongView() {
   // --- 7. Main Handlers ---
   const handleSaveEdit = async () => {
     try {
-      const { error } = await (supabase.from('musicbox_setlist') as any).update({
+      const { error } = await (supabase.from('cromiasety_setlist') as any).update({
         content_raw: editedContent,
         title: song.title,
         artist: song.artist,
@@ -767,10 +821,27 @@ export default function SongView() {
     <div className={`min-h-screen bg-background text-foreground font-sans transition-colors duration-300 ${isDarkMode ? 'dark' : 'light'} ${!isDarkMode && settings.isWarmWhite ? 'warm' : ''}`}>
       <header className="fixed top-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-sm border-b border-foreground/5 z-50 flex items-center justify-between px-6 shadow-xl ">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-foreground/5 transition-all"><ArrowLeft className="w-6 h-6" /></button>
+          <button 
+            onClick={() => {
+              if (setlistId) navigate(`/setlists/${setlistId}`);
+              else navigate(-1);
+            }} 
+            className="p-2 rounded-full hover:bg-foreground/5 transition-all"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
           <div>
-            <h1 className="font-bold text-lg leading-tight">{song.title}</h1>
-            <p className="text-xs text-foreground/50">{song.artist}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="font-bold text-lg leading-tight">
+                {id?.startsWith('interval_') ? (setlistSongs[currentSetlistIndex]?.interval_name || 'Pausa') : (song?.title || 'Carregando...')}
+              </h1>
+              {setlistId && currentSetlistIndex !== -1 && (
+                <span className="text-[10px] font-black bg-brand-purple text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                  {currentSetlistIndex + 1} / {setlistSongs.length}
+                </span>
+              )}
+            </div>
+            {!id?.startsWith('interval_') && <p className="text-xs text-foreground/50">{song?.artist}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -822,11 +893,13 @@ export default function SongView() {
                 {['showTabs', 'showSections', 'showMetadata', 'showArtwork'].map(key => (
                   <button key={key} onClick={() => updateGlobalSetting(key, !(settings as any)[key])} className={`p-3 rounded-2xl border transition-all shadow-xl flex flex-col items-center gap-2 ${(settings as any)[key] ? 'bg-brand-purple/20 border-brand-purple' : 'bg-foreground/5 border-transparent'}`}>
                     <span className="text-[10px] font-bold uppercase opacity-60">{key.replace('show', '')}</span>
-                    <div className={`w-8 h-4 rounded-full p-0.5 ${(settings as any)[key] ? 'bg-brand-purple' : 'bg-foreground/20'}`}><div className={`w-3 h-3 bg-white rounded-full transition-all ${(settings as any)[key] ? 'translate-x-4' : ''}`} /></div>
+                    <div className={`w-8 h-4 rounded-full p-0.5 ${(settings as any)[key] ? 'bg-brand-purple' : 'bg-foreground/20'}`}>
+                      <div className={`w-3 h-3 bg-white rounded-full transition-all ${(settings as any)[key] ? 'translate-x-4' : ''}`} />
+                    </div>
                   </button>
                 ))}
               </div>
-
+ 
               {!isDarkMode && (
                 <button
                   onClick={() => updateGlobalSetting('isWarmWhite', !settings.isWarmWhite)}
@@ -915,118 +988,157 @@ export default function SongView() {
         </div>
       )}
 
-      <main className="pt-24 pb-32 px-6 max-w-4xl mx-auto">
-        <div className="mb-8 space-y-6">
-          {isEditing ? (
-            <div className="space-y-4">
-              <input value={song.title} onChange={(e) => setSong({ ...song, title: e.target.value })} className="text-5xl font-black bg-transparent border-b-2 border-brand-purple/30 w-full outline-none" />
-              <input value={song.artist} onChange={(e) => setSong({ ...song, artist: e.target.value })} className="text-2xl text-brand-accent/60 bg-transparent border-b border-white/10 w-full outline-none" />
-              <textarea
-                value={song.observations || ''}
-                onChange={(e) => setSong({ ...song, observations: e.target.value })}
-                placeholder={t('observations_placeholder')}
-                className="w-full bg-transparent border-b border-white/10 outline-none text-sm opacity-60 italic resize-none"
-                rows={2}
-              />
-            </div>
-          ) : (
-            <div className="flex items-start gap-8 ">
-              {settings.showArtwork && song.artwork_url && <div className="w-32 h-32 mt-2 overflow-hidden shrink-0 shadow-[0_8px_20px_rgba(0,0,0,0.5)]"><img src={song.artwork_url} className="w-full h-full object-cover" /></div>}
-              <div className="flex-1 min-w-0">
-                <h1 className={`font-black tracking-tighter ${settings.title.font}`} style={{ fontSize: `${settings.title.size}px`, color: getEffectiveColor(settings.title.color), marginBottom: `${settings.headerGap || 0}px`, lineHeight: '1.1' }}>{song.title}</h1>
-                <h2 className={`font-bold opacity-80 tracking-tight ${settings.artist.font}`} style={{ fontSize: `${settings.artist.size}px`, color: getEffectiveColor(settings.artist.color), lineHeight: '1.2' }}>{song.artist}</h2>
-                {settings.showMetadata && (song.genre || song.release_date || song.album_name || song.bpm || song.key) && (
-                  <div className={`flex flex-wrap gap-2 ${settings.metadata?.font || 'font-inter'} ${settings.metadata?.bold ? 'font-bold' : ''}`} style={{ fontSize: `${settings.metadata?.size || 10}px`, color: getEffectiveColor(settings.metadata?.color || '#ffffff'), marginTop: `${settings.metadataGapTop ?? 8}px` }}>
-                    {song.bpm && <span className="px-2 py-0.5 rounded-md bg-brand-purple/20 text-brand-accent font-bold">{song.bpm} BPM</span>}
-                    {song.original_key && <span className="px-2 py-0.5 rounded-md bg-brand-purple/20 text-brand-accent font-bold">{song.original_key}</span>}
-                    {song.genre && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60">{song.genre}</span>}
-                    {song.release_date && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60">{new Date(song.release_date).getFullYear()}</span>}
-                    {song.album_name && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60 line-clamp-1">{song.album_name}</span>}
-                  </div>
-                )}
-                {song.observations && (
-                  <div className={`mt-0 ${isDarkMode ? 'bg-white/10' : 'bg-foreground/10'} pl-4 pr-4 w-fit ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}>
-                    {song.observations}
+      <AnimatePresence mode="wait">
+        <motion.main 
+          key={id}
+          drag={setlistId ? "x" : false}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={(_, info) => {
+            if (!setlistId) return;
+            const swipeThreshold = 50;
+            if (info.offset.x > swipeThreshold) handlePrevInSetlist();
+            else if (info.offset.x < -swipeThreshold) handleNextInSetlist();
+          }}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          className="pt-24 pb-32 px-6 max-w-4xl mx-auto"
+        >
+          <div className="mb-8 space-y-6">
+            {id?.startsWith('interval_') ? (
+              /* Página de Pausa */
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <motion.div 
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="w-40 h-40 rounded-full bg-brand-purple/10 flex items-center justify-center mb-12 shadow-2xl shadow-brand-purple/20"
+                >
+                  <Moon className="w-20 h-20 text-brand-purple" fill="currentColor" />
+                </motion.div>
+                <h2 className="text-6xl md:text-8xl font-black text-white mb-6 tracking-tighter uppercase">
+                  {setlistSongs[currentSetlistIndex]?.interval_name || 'Hora da Pausa!'}
+                </h2>
+                <p className="text-2xl md:text-3xl text-brand-accent font-bold mb-12 italic">
+                  Aproveita pra beber uma água e descansar! 🥤
+                </p>
+                {setlistSongs[currentSetlistIndex]?.interval_duration && (
+                  <div className="px-16 py-8 rounded-[3rem] bg-brand-purple text-white text-5xl font-black shadow-2xl shadow-brand-purple/50">
+                    {setlistSongs[currentSetlistIndex]?.interval_duration} MIN
                   </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
+            ) : isEditing ? (
+              <div className="space-y-4">
+                <input value={song?.title} onChange={(e) => setSong({ ...song, title: e.target.value })} className="text-5xl font-black bg-transparent border-b-2 border-brand-purple/30 w-full outline-none" />
+                <input value={song?.artist} onChange={(e) => setSong({ ...song, artist: e.target.value })} className="text-2xl text-brand-accent/60 bg-transparent border-b border-white/10 w-full outline-none" />
+                <textarea
+                  value={song?.observations || ''}
+                  onChange={(e) => setSong({ ...song, observations: e.target.value })}
+                  placeholder={t('observations_placeholder')}
+                  className="w-full bg-transparent border-b border-white/10 outline-none text-sm opacity-60 italic resize-none"
+                  rows={2}
+                />
+              </div>
+            ) : (
+              <div className="flex items-start gap-8 ">
+                {settings.showArtwork && song?.artwork_url && <div className="w-32 h-32 mt-2 overflow-hidden shrink-0 shadow-[0_8px_20px_rgba(0,0,0,0.5)]"><img src={song.artwork_url} className="w-full h-full object-cover" /></div>}
+                <div className="flex-1 min-w-0">
+                  <h1 className={`font-black tracking-tighter ${settings.title.font}`} style={{ fontSize: `${settings.title.size}px`, color: getEffectiveColor(settings.title.color), marginBottom: `${settings.headerGap || 0}px`, lineHeight: '1.1' }}>{song?.title}</h1>
+                  <h2 className={`font-bold opacity-80 tracking-tight ${settings.artist.font}`} style={{ fontSize: `${settings.artist.size}px`, color: getEffectiveColor(settings.artist.color), lineHeight: '1.2' }}>{song?.artist}</h2>
+                  {settings.showMetadata && (song?.genre || song?.release_date || song?.album_name || song?.bpm || song?.key) && (
+                    <div className={`flex flex-wrap gap-2 ${settings.metadata?.font || 'font-inter'} ${settings.metadata?.bold ? 'font-bold' : ''}`} style={{ fontSize: `${settings.metadata?.size || 10}px`, color: getEffectiveColor(settings.metadata?.color || '#ffffff'), marginTop: `${settings.metadataGapTop ?? 8}px` }}>
+                      {song?.bpm && <span className="px-2 py-0.5 rounded-md bg-brand-purple/20 text-brand-accent font-bold">{song.bpm} BPM</span>}
+                      {song?.original_key && <span className="px-2 py-0.5 rounded-md bg-brand-purple/20 text-brand-accent font-bold">{song.original_key}</span>}
+                      {song?.genre && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60">{song.genre}</span>}
+                      {song?.release_date && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60">{new Date(song.release_date).getFullYear()}</span>}
+                      {song?.album_name && <span className="px-2 py-0.5 rounded-md bg-foreground/5 opacity-60 line-clamp-1">{song.album_name}</span>}
+                    </div>
+                  )}
+                  {song?.observations && (
+                    <div className={`mt-0 ${isDarkMode ? 'bg-white/10' : 'bg-foreground/10'} pl-4 pr-4 w-fit ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}>
+                      {song.observations}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
-        <div className="chord-sheet-container">
-          {isEditing && (
-            <div className="flex gap-2 mb-6 p-1 bg-foreground/5 rounded-2xl w-fit">
-              <button onClick={() => setEditMode('live')} className={`px-6 py-2 rounded-xl ${editMode === 'live' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40'}`}>Edição Visual</button>
-              <button onClick={() => setEditMode('classic')} className={`px-6 py-2 rounded-xl ${editMode === 'classic' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40'}`}>Modo Texto</button>
-            </div>
-          )}
-          {isEditing && editMode === 'classic' ? (
-            <textarea value={editedContent} onChange={(e) => setEditedContent(e.target.value)} className="w-full min-h-[60vh] bg-foreground/5 p-8 rounded-3xl font-mono outline-none border border-foreground/10" />
-          ) : (
-            <div key={revision} className={`leading-relaxed ${isEditing ? 'editing-mode cursor-text' : ''}`}>
-              {(() => {
-                const lines = (isEditing ? editedContent : (song.content_raw || '')).split('\n');
-                const mappedLines = lines.map((text: string, idx: number) => ({ text, originalIdx: idx }));
+          <div className="chord-sheet-container">
+            {!id?.startsWith('interval_') && isEditing && (
+              <div className="flex gap-2 mb-6 p-1 bg-foreground/5 rounded-2xl w-fit">
+                <button onClick={() => setEditMode('live')} className={`px-6 py-2 rounded-xl ${editMode === 'live' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40'}`}>Edição Visual</button>
+                <button onClick={() => setEditMode('classic')} className={`px-6 py-2 rounded-xl ${editMode === 'classic' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40'}`}>Modo Texto</button>
+              </div>
+            )}
+            {!id?.startsWith('interval_') && (isEditing && editMode === 'classic' ? 
+              <textarea value={editedContent} onChange={(e) => setEditedContent(e.target.value)} className="w-full min-h-[60vh] bg-foreground/5 p-8 rounded-3xl font-mono outline-none border border-foreground/10" />
+            : 
+              <div key={revision} className={`leading-relaxed ${isEditing ? 'editing-mode cursor-text' : ''}`}>
+                {(() => {
+                  const lines = (isEditing ? editedContent : (song?.content_raw || '')).split('\n');
+                  const mappedLines = lines.map((text: string, idx: number) => ({ text, originalIdx: idx }));
 
-                let filteredMapped = [...mappedLines];
-                if (!settings.showTabs && !isEditing) {
-                  let currentBlock: number[] = [];
-                  for (let i = 0; i <= mappedLines.length; i++) {
-                    if (i < mappedLines.length && mappedLines[i].text.trim() !== '') {
-                      currentBlock.push(i);
+                  let filteredMapped = [...mappedLines];
+                  if (!settings.showTabs && !isEditing) {
+                    let currentBlock: number[] = [];
+                    for (let i = 0; i <= mappedLines.length; i++) {
+                      if (i < mappedLines.length && mappedLines[i].text.trim() !== '') {
+                        currentBlock.push(i);
+                      } else {
+                        if (currentBlock.length > 0) {
+                          const blockContent = currentBlock.map(idx => mappedLines[idx].text);
+                          const hasTab = blockContent.some(l => /^[A-Ge]\|[-|0-9a-z ]+/i.test(l.trim()) || l.includes('---'));
+                          const hasLyr = blockContent.some(l => /\[.*?\]/.test(l) && l.trim().split(/\[.*?\]/g).some((p: string) => p.trim().length > 0));
+                          if (hasTab && !hasLyr) currentBlock.forEach(idx => { filteredMapped[idx] = null; });
+                        }
+                        currentBlock = [];
+                      }
+                    }
+                  }
+
+                  const finalLines = (filteredMapped.filter(l => l !== null) as any[]).filter((l, i, arr) => !(l.text.trim() === '' && i > 0 && arr[i - 1].text.trim() === ''));
+
+                  const groups: any[] = [];
+                  let currentChorus: any[] | null = null;
+                  finalLines.forEach((lineObj) => {
+                    const low = lineObj.text.trim().toLowerCase();
+                    if (low === '{soc}' || low === '{start_of_chorus}') {
+                      currentChorus = [];
+                      if (groups.length > 0 && groups[groups.length - 1].type === 'line' && /^\[[^\]]+\]$/.test(groups[groups.length - 1].lines[0].text.trim())) {
+                        currentChorus.push(groups.pop().lines[0]);
+                      }
+                    } else if (low === '{eoc}' || low === '{end_of_chorus}') {
+                      if (currentChorus) { groups.push({ type: 'chorus', lines: currentChorus }); currentChorus = null; }
                     } else {
-                      if (currentBlock.length > 0) {
-                        const blockContent = currentBlock.map(idx => mappedLines[idx].text);
-                        const hasTab = blockContent.some(l => /^[A-Ge]\|[-|0-9a-z ]+/i.test(l.trim()) || l.includes('---'));
-                        const hasLyr = blockContent.some(l => /\[.*?\]/.test(l) && l.trim().split(/\[.*?\]/g).some((p: string) => p.trim().length > 0));
-                        if (hasTab && !hasLyr) currentBlock.forEach(idx => { filteredMapped[idx] = null; });
-                      }
-                      currentBlock = [];
+                      if (currentChorus) currentChorus.push(lineObj); else groups.push({ type: 'line', lines: [lineObj] });
                     }
-                  }
-                }
+                  });
 
-                const finalLines = (filteredMapped.filter(l => l !== null) as any[]).filter((l, i, arr) => !(l.text.trim() === '' && i > 0 && arr[i - 1].text.trim() === ''));
-
-                const groups: any[] = [];
-                let currentChorus: any[] | null = null;
-                finalLines.forEach((lineObj) => {
-                  const low = lineObj.text.trim().toLowerCase();
-                  if (low === '{soc}' || low === '{start_of_chorus}') {
-                    currentChorus = [];
-                    if (groups.length > 0 && groups[groups.length - 1].type === 'line' && /^\[[^\]]+\]$/.test(groups[groups.length - 1].lines[0].text.trim())) {
-                      currentChorus.push(groups.pop().lines[0]);
-                    }
-                  } else if (low === '{eoc}' || low === '{end_of_chorus}') {
-                    if (currentChorus) { groups.push({ type: 'chorus', lines: currentChorus }); currentChorus = null; }
-                  } else {
-                    if (currentChorus) currentChorus.push(lineObj); else groups.push({ type: 'line', lines: [lineObj] });
-                  }
-                });
-
-                return (
-                  <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
-                    {groups.flatMap((g, gi) => {
-                      if (g.type === 'chorus') {
-                        const showBrack = settings.showSections || isEditing;
-                        return (
-                          <div key={`chorus-${gi}`} className={`pl-6 ml-4 my-2 transition-all ${showBrack ? 'border-l-4' : 'border-l-0'}`} style={{ borderLeftColor: settings.sections?.color || '#a855f7' }}>
-                            <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
-                              {g.lines.map((l: any) => renderLine(l.text, l.originalIdx, true))}
+                  return (
+                    <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
+                      {groups.flatMap((g, gi) => {
+                        if (g.type === 'chorus') {
+                          const showBrack = settings.showSections || isEditing;
+                          return (
+                            <div key={`chorus-${gi}`} className={`pl-6 ml-4 my-2 transition-all ${showBrack ? 'border-l-4' : 'border-l-0'}`} style={{ borderLeftColor: settings.sections?.color || '#a855f7' }}>
+                              <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
+                                {g.lines.map((l: any) => renderLine(l.text, l.originalIdx, true))}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      }
-                      return g.lines.map((l: any) => renderLine(l.text, l.originalIdx, false));
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-      </main>
+                          );
+                        }
+                        return g.lines.map((l: any) => renderLine(l.text, l.originalIdx, false));
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </motion.main>
+      </AnimatePresence>
 
       {contextMenu && isEditing && (
         <div className="fixed z-[100] bg-background/95 backdrop-blur-xl border border-foreground/10 shadow-2xl rounded-2xl p-2 min-w-[240px] animate-in fade-in zoom-in duration-200"
