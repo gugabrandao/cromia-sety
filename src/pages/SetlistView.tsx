@@ -235,7 +235,7 @@ export default function SetlistView() {
         <button
           onClick={async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            const { data, error } = await (supabase.from('cromiasety_setlist') as any).insert({
+            const { data, error: _error } = await (supabase.from('cromiasety_setlist') as any).insert({
               user_id: user?.id,
               title: 'Nova Cifra',
               artist: 'Artista Desconhecido',
