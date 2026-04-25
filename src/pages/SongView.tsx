@@ -733,7 +733,7 @@ export default function SongView() {
                 &#8203;
                 {chords.find(c => c.offset >= plainText.length) && (
                   <div className="absolute -top-[1.65em] left-1/2 -translate-x-1/2 flex items-center group/chord z-20">
-                    <button onMouseDown={(e) => moveChord(originalIdx, chords.find(c => c.offset >= plainText.length)!.partIdx, 'left')} className="opacity-0 group-hover/chord:opacity-100 p-0.5 rounded bg-brand-purple/10 cursor-pointer"><ChevronLeft className="w-3 h-3" /></button>
+                    <button onMouseDown={() => moveChord(originalIdx, chords.find(c => c.offset >= plainText.length)!.partIdx, 'left')} className="opacity-0 group-hover/chord:opacity-100 p-0.5 rounded bg-brand-purple/10 cursor-pointer"><ChevronLeft className="w-3 h-3" /></button>
                     <span
                       contentEditable
                       suppressContentEditableWarning
@@ -744,7 +744,7 @@ export default function SongView() {
                     >
                       {isChord(chords.find(c => c.offset >= plainText.length)!.name) ? currentTransposeLine(chords.find(c => c.offset >= plainText.length)!.name, currentTranspose) : chords.find(c => c.offset >= plainText.length)!.name}
                     </span>
-                    <button onMouseDown={(e) => moveChord(originalIdx, chords.find(c => c.offset >= plainText.length)!.partIdx, 'right')} className="opacity-0 group-hover/chord:opacity-100 p-0.5 rounded bg-brand-purple/10 cursor-pointer"><ChevronRight className="w-3 h-3" /></button>
+                    <button onMouseDown={() => moveChord(originalIdx, chords.find(c => c.offset >= plainText.length)!.partIdx, 'right')} className="opacity-0 group-hover/chord:opacity-100 p-0.5 rounded bg-brand-purple/10 cursor-pointer"><ChevronRight className="w-3 h-3" /></button>
                   </div>
                 )}
               </span>
@@ -775,7 +775,6 @@ export default function SongView() {
                 const selectionStart = e.target.selectionStart;
 
                 // Heurística de Diff para "Sticky Chords"
-                let changePos = selectionStart;
                 const diff = newValue.length - oldValue.length;
 
                 // Se o diff for negativo (delete), a posição da mudança é o cursor atual

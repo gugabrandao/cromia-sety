@@ -169,10 +169,10 @@ export default function SetlistDetailView() {
       return;
     }
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('cromiasety_setlists')
         .update({ name: editedName.trim() })
-        .eq('id', id);
+        .eq('id', id!);
       if (error) throw error;
       setSetlist({ ...setlist, name: editedName.trim() });
     } catch (err) {

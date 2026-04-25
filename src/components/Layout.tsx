@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Mic2, LayoutDashboard, Settings, User,
+  Mic2, LayoutDashboard, User,
   Sun, Moon, Globe, ListMusic, LogOut
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';

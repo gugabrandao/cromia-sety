@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search as SearchIcon, Music2, Plus, Loader2,
-  Guitar, Check, X, ArrowRight, Sparkles
+  Guitar, Check, X, Sparkles
 } from 'lucide-react';
 import { chordService } from '../services/chordService';
 import type { SongResult } from '../services/chordService';
@@ -17,7 +16,6 @@ interface SearchModalProps {
 }
 
 export default function SearchModal({ isOpen, onClose, onSongAdded }: SearchModalProps) {
-  const { t } = useTranslation();
 
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);

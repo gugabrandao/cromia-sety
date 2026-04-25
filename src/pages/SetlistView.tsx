@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
-import { Search, Play, Settings2, Moon, Guitar, Activity, Settings, Loader2, Save, Plus, Trash2 } from 'lucide-react';
+import { Search, Play, Settings2, Guitar, Activity, Settings, Loader2, Save, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSongMetadata } from '../services/spotifyService';
 import SearchModal from '../components/SearchModal';

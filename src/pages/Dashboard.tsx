@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   Music2, Mic2, Plus, Play, ArrowRight, Guitar, Drum,
-  Trash2, SearchIcon, Smile
+  Trash2, SearchIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { 
-  X, Mail, Lock, Loader2, Check, ShieldCheck, 
-  ChevronRight, ArrowRight, UserCircle, Eye, EyeOff, Camera,
+  X, Lock, Loader2, Check, ShieldCheck, 
+  ArrowRight, UserCircle, Eye, EyeOff, Camera,
   User, Phone 
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
