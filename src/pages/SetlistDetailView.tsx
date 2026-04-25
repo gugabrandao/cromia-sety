@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
-import { Plus, Moon, Settings2, Trash2, ArrowLeft, Loader2, Guitar, Activity, Calendar, Watch } from 'lucide-react';
+import { Plus, Moon, Settings2, Trash2, ArrowLeft, Loader2, Guitar, Activity, Calendar, Watch, Pencil, Check, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -63,6 +63,10 @@ export default function SetlistDetailView() {
   const [setlist, setSetlist] = useState<any>(null);
   const [setlistSongs, setSetlistSongs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Edit Name State
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
 
   // Modal de Adicionar Músicas
   const [showAddModal, setShowAddModal] = useState(false);
@@ -153,11 +157,37 @@ export default function SetlistDetailView() {
     setIsLoading(false);
   }
 
+  // --- Funções de Edição do Nome ---
+  const handleEditName = () => {
+    setEditedName(setlist.name);
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!editedName.trim() || editedName === setlist.name) {
+      setIsEditingName(false);
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('cromiasety_setlists')
+        .update({ name: editedName.trim() })
+        .eq('id', id);
+      if (error) throw error;
+      setSetlist({ ...setlist, name: editedName.trim() });
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao atualizar nome do setlist.');
+    } finally {
+      setIsEditingName(false);
+    }
+  };
+
   // Abre o modal e busca a biblioteca geral do usuário
   async function openAddModal() {
     setShowAddModal(true);
     const { data } = await supabase
-      .from('cromiasety_setlist')
+      .from('cromiasety_songs')
       .select('id, title, artist, artwork_url, original_key, bpm, duration_ms')
       .order('title', { ascending: true });
 
@@ -366,9 +396,17 @@ export default function SetlistDetailView() {
                   exit={{ opacity: 0, x: -20 }}
                   className="w-full max-w-4xl flex flex-col items-center text-center cursor-grab active:cursor-grabbing"
                 >
-                  <div className="text-brand-purple font-black text-2xl mb-8 tracking-widest uppercase">
+                  <div className="text-brand-purple font-black text-2xl mb-4 tracking-widest uppercase">
                     {currentPalcoIndex + 1} DE {setlistSongs.length}
                   </div>
+
+                  {currentPalcoIndex > 0 && (
+                    <div className="text-white/20 text-3xl md:text-4xl font-black mb-12 truncate max-w-full tracking-tighter uppercase">
+                      {setlistSongs[currentPalcoIndex - 1].is_interval 
+                        ? setlistSongs[currentPalcoIndex - 1].interval_name || 'Pausa'
+                        : setlistSongs[currentPalcoIndex - 1].song?.title}
+                    </div>
+                  )}
 
                   {setlistSongs[currentPalcoIndex].is_interval ? (
                     <div className="flex flex-col items-center">
@@ -413,6 +451,14 @@ export default function SetlistDetailView() {
                       )}
                     </div>
                   )}
+
+                  {currentPalcoIndex < setlistSongs.length - 1 && (
+                    <div className="text-white/20 text-3xl md:text-4xl font-black mt-16 truncate max-w-full tracking-tighter uppercase">
+                      {setlistSongs[currentPalcoIndex + 1].is_interval 
+                        ? setlistSongs[currentPalcoIndex + 1].interval_name || 'Pausa'
+                        : setlistSongs[currentPalcoIndex + 1].song?.title}
+                    </div>
+                  )}
                 </motion.div>
               </AnimatePresence>
             </>
@@ -431,8 +477,26 @@ export default function SetlistDetailView() {
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-        <div>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tighter mb-4">{setlist.name}</h1>
+        <div className="flex-1">
+          {isEditingName ? (
+            <div className="flex items-center gap-2 mb-4 w-full max-w-2xl">
+              <input 
+                type="text" 
+                value={editedName} 
+                onChange={(e) => setEditedName(e.target.value)} 
+                autoFocus 
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setIsEditingName(false); }}
+                className="text-4xl md:text-6xl font-black tracking-tighter bg-transparent border-b-2 border-brand-purple outline-none focus:border-brand-accent w-full"
+              />
+              <button onClick={handleSaveName} className="p-3 bg-green-500/20 text-green-500 rounded-full hover:bg-green-500 hover:text-white transition-all"><Check className="w-6 h-6" /></button>
+              <button onClick={() => setIsEditingName(false)} className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><X className="w-6 h-6" /></button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 mb-4 group cursor-pointer w-fit" onClick={handleEditName} title="Editar Nome">
+              <h1 className="text-4xl md:text-6xl font-black tracking-tighter">{setlist.name}</h1>
+              <Pencil className="w-6 h-6 text-foreground/20 group-hover:text-brand-purple transition-colors" />
+            </div>
+          )}
           <div className="flex flex-wrap gap-4 text-foreground/50 text-sm font-bold uppercase tracking-widest">
             <span>{setlistSongs.filter(s => !s.is_interval).length} Músicas</span>
             <span className="flex items-center gap-1 text-foreground/50"><Watch className="w-5 h-5" /> {msToTime(totalMs)} Total</span>

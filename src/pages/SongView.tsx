@@ -36,7 +36,7 @@ function EditableLine({ line, originalIdx, isTabLine, isEditing, settings, getEf
 
   if (!isEditing) {
     return (
-      <div className="min-h-[1.5em] py-1" onContextMenu={(e) => handleContextMenu(e, originalIdx, isInsideChorus, 0)}>
+      <div className="min-h-[1.5em] py-1" style={{ marginBottom: `${line.trim() === '' ? (settings.paragraphGap ?? 16) : (settings.plainLineGap ?? 0)}px` }} onContextMenu={(e) => handleContextMenu(e, originalIdx, isInsideChorus, 0)}>
         <span className={`${fontClass} ${settings.lyrics.italic ? 'italic' : ''} ${settings.lyrics.bold ? 'font-bold' : ''}`}
           style={{ fontSize: `${fontSize}px`, color }}>
           {line}
@@ -47,6 +47,7 @@ function EditableLine({ line, originalIdx, isTabLine, isEditing, settings, getEf
 
   return (
     <div className="relative min-h-[1.5em] py-1 group/line transition-all px-4 -mx-4 rounded-xl"
+      style={{ marginBottom: `${localValue.trim() === '' ? (settings.paragraphGap ?? 16) : (settings.plainLineGap ?? 0)}px` }}
       onContextMenu={(e) => {
         let offset = 0;
         if (e.target instanceof HTMLTextAreaElement) {
@@ -107,7 +108,7 @@ export default function SongView() {
           .select('id, song_id, position, is_interval, interval_name, interval_duration')
           .eq('setlist_id', setlistId)
           .order('position', { ascending: true });
-        
+
         if (data) {
           const formatted = (data as any[]).map(item => ({
             ...item,
@@ -140,11 +141,13 @@ export default function SongView() {
   const [song, setSong] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [songScrollSpeed, setSongScrollSpeed] = useState(5);
   const scrollRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number | undefined>(undefined);
   const [currentTranspose, setTranspose] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editMode, setEditMode] = useState<'live' | 'classic'>('live');
+  const [isSplitMode, setIsSplitMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editedContent, setEditedContent] = useState('');
   const latestContent = useRef('');
@@ -156,6 +159,19 @@ export default function SongView() {
   const [revision, setRevision] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, lineIdx: number, isChorus: boolean, charOffset: number } | null>(null);
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+  const [lastInsertedLineIdx, setLastInsertedLineIdx] = useState<number | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (lastInsertedLineIdx !== null && isEditing && editMode === 'live') {
+      const newLineIdx = lastInsertedLineIdx + 1;
+      const element = document.querySelector(`[data-line-idx="${newLineIdx}"] textarea`) as HTMLElement;
+      if (element) {
+        element.focus();
+        setLastInsertedLineIdx(null);
+      }
+    }
+  }, [editedContent, lastInsertedLineIdx, isEditing, editMode]);
 
   const sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -164,28 +180,31 @@ export default function SongView() {
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('musicbox_global_settings');
     const defaults = {
-      title: { size: 60, color: '#fffceb', font: 'font-outfit' },
-      artist: { size: 36, color: '#f07400', font: 'font-inter' },
-      observations: { size: 33, color: '#bd5b00', font: 'font-outfit', italic: false },
+      title: { size: 69, color: '#fffceb', font: 'font-outfit' },
+      artist: { size: 50, color: '#f07400', font: 'font-outfit' },
+      observations: { size: 37, color: '#bd5b00', font: 'font-outfit', italic: false },
       sections: { size: 20, color: '#f07400', font: 'font-mono-custom', italic: false, bold: false },
-      chords: { size: 20, color: '#ff8800', font: 'font-mono-custom' },
-      lyrics: { size: 22, color: '#ffffff', font: 'font-outfit' },
+      chords: { size: 25, color: '#ff8800', font: 'font-mono-custom' },
+      lyrics: { size: 25, color: '#ffffff', font: 'font-outfit' },
       tabs: { size: 17, color: '#ffffff', font: 'font-fira' },
-      metadata: { size: 15, color: '#ffffff', font: 'font-inter', bold: true },
+      metadata: { size: 23, color: '#ffffff', font: 'font-inter', bold: true },
       observationsBg: '#ff8800',
-      headerGap: -2,
-      chordLyricGap: -7,
-      lineGap: 0,
-      sectionGapTop: 0,
+      headerGap: -3,
+      chordLyricGap: -8,
+      lineGap: 7,
+      instrumentalGap: 0,
+      plainLineGap: 0,
+      paragraphGap: 4,
+      sectionGapTop: 30,
       sectionGapBottom: 7,
-      showTabs: true,
+      showTabs: false,
       showSections: true,
       showMetadata: true,
       showArtwork: true,
       isDarkMode: false,
-      scrollSpeed: 5,
+      scrollSpeed: 7,
       useFlats: false,
-      metadataGapTop: 8,
+      metadataGapTop: 7,
       isWarmWhite: false
     };
     return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
@@ -195,8 +214,8 @@ export default function SongView() {
     localStorage.setItem('musicbox_global_settings', JSON.stringify(settings));
   }, [settings]);
 
-  const updateSetting = (element: string, key: string, value: any) => {
-    addSettingsToHistory(settings);
+  const updateSetting = (element: string, key: string, value: any, saveHistory = true) => {
+    if (saveHistory) addSettingsToHistory(settings);
     setSettings((prev: any) => ({
       ...prev,
       [element]: typeof prev[element as keyof typeof prev] === 'object'
@@ -205,8 +224,8 @@ export default function SongView() {
     }));
   };
 
-  const updateGlobalSetting = (key: string, value: any) => {
-    addSettingsToHistory(settings);
+  const updateGlobalSetting = (key: string, value: any, saveHistory = true) => {
+    if (saveHistory) addSettingsToHistory(settings);
     setSettings((prev: any) => ({ ...prev, [key]: value }));
   };
 
@@ -258,7 +277,7 @@ export default function SongView() {
         setSong((prev: any) => ({ ...prev, ...updatedFields }));
 
         // Auto-save to Supabase directly to columns
-        const { error } = await (supabase.from('cromiasety_setlist') as any)
+        const { error } = await (supabase.from('cromiasety_songs') as any)
           .update(updatedFields)
           .eq('id', id);
 
@@ -325,7 +344,7 @@ export default function SongView() {
   // --- 4. Content Handlers ---
   const isChord = (token: string) => {
     if (!token) return false;
-    return /^[A-G][b#]?(m|min|maj|M|dim|aug|sus|add|ø|º|7M|7|6|5|4|2|9|11|13|\+|\-|\(|\))*(\/[A-G][b#]?)?$/.test(token.trim());
+    return /^[A-G][b#]?(m|min|maj|M|dim|aug|sus|add|ø|º|°|7M|7|6|5|4|2|9|11|13|\+|\-|\(|\))*(\/[A-G][b#]?)?$/.test(token.trim());
   };
 
   const currentTransposeLine = (line: string, amount: number) => {
@@ -382,6 +401,7 @@ export default function SongView() {
     const newLines = [...lines];
     newLines.splice(lineIdx + 1, 0, '');
     setEditedContent(newLines.join('\n'));
+    setLastInsertedLineIdx(lineIdx);
   }, [addToHistory]);
 
   const handlePartChange = (lineIdx: number, partIdx: number, newValue: string, isChordPart: boolean) => {
@@ -434,14 +454,51 @@ export default function SongView() {
     setEditedContent(lines.join('\n'));
   };
 
-  const addChordToLine = (lineIdx: number, charOffset: number) => {
+  const mapPlainToOriginalOffset = (originalLine: string, plainOffset: number) => {
+    let originalOffset = 0;
+    let currentPlain = 0;
+
+    while (currentPlain < plainOffset && originalOffset < originalLine.length) {
+      if (originalLine[originalOffset] === '[') {
+        while (originalOffset < originalLine.length && originalLine[originalOffset] !== ']') {
+          originalOffset++;
+        }
+        originalOffset++; // Pula o ']'
+      } else {
+        currentPlain++;
+        originalOffset++;
+      }
+    }
+
+    // Se paramos em cima de um acorde recém-pulado ou de uma sequência de acordes, 
+    // precisamos garantir que o novo acorde venha depois deles se o offset já foi atingido
+    while (originalOffset < originalLine.length && originalLine[originalOffset] === '[') {
+      while (originalOffset < originalLine.length && originalLine[originalOffset] !== ']') {
+        originalOffset++;
+      }
+      originalOffset++;
+    }
+
+    return originalOffset;
+  };
+
+  const addChordToLine = (lineIdx: number, plainOffset: number, chordName: string = '') => {
     const prevContent = latestContent.current;
+    addToHistory(prevContent);
+
+    if (lineIdx === -1) {
+      const newText = prevContent.slice(0, plainOffset) + `[${chordName}]` + prevContent.slice(plainOffset);
+      setEditedContent(newText);
+      return;
+    }
+
     const lines = prevContent.split('\n');
     if (lineIdx < 0 || lineIdx >= lines.length) return;
 
-    addToHistory(prevContent);
     const line = lines[lineIdx];
-    const newLine = line.slice(0, charOffset) + '[]' + line.slice(charOffset);
+    const realOffset = (editMode === 'live') ? mapPlainToOriginalOffset(line, plainOffset) : plainOffset;
+
+    const newLine = line.slice(0, realOffset) + `[${chordName}]` + line.slice(realOffset);
     lines[lineIdx] = newLine;
     setEditedContent(lines.join('\n'));
   };
@@ -450,6 +507,29 @@ export default function SongView() {
     if (!isEditing) return;
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, lineIdx, isChorus, charOffset });
+  };
+
+  const handleTextareaContextMenu = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    if (!isEditing) return;
+    e.preventDefault();
+    const target = e.currentTarget;
+    const offset = target.selectionStart || 0;
+    setContextMenu({ x: e.clientX, y: e.clientY, lineIdx: -1, isChorus: false, charOffset: offset });
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    if (!typingTimeoutRef.current) {
+      addToHistory(latestContent.current);
+    } else {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    setEditedContent(newValue);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      typingTimeoutRef.current = null;
+    }, 1000);
   };
 
   const toggleChorus = (targetIdx: number, forceRemove = false) => {
@@ -571,6 +651,185 @@ export default function SongView() {
     }
 
     if (isChordProLine) {
+      if (isEditing && editMode === 'live') {
+        // --- NOVO MODO DE EDIÇÃO VISUAL HÍBRIDO (FLEXÍVEL) ---
+        const chords: { name: string; offset: number; partIdx: number }[] = [];
+        let plainText = '';
+        let currentOffset = 0;
+        const parts = line.split(/(\[.*?\])/g);
+
+        parts.forEach((p, pIdx) => {
+          if (p.startsWith('[') && p.endsWith(']')) {
+            chords.push({ name: p.slice(1, -1), offset: currentOffset, partIdx: pIdx });
+          } else {
+            plainText += p;
+            currentOffset += p.length;
+          }
+        });
+
+        const fontStyle = {
+          fontSize: `${settings.lyrics.size}px`,
+          fontFamily: settings.lyrics.font.replace('font-', ''),
+          fontStyle: settings.lyrics.italic ? 'italic' : 'normal',
+          fontWeight: settings.lyrics.bold ? 'bold' : 'normal',
+          letterSpacing: 'normal',
+          lineHeight: '1.2'
+        };
+
+        const isInstrumental = plainText.trim() === '';
+
+        return (
+          <div
+            key={`visual-${originalIdx}`}
+            data-line-idx={originalIdx}
+            className="visual-line-hybrid relative min-h-[4.5em] pt-8 pb-2 px-4 -mx-4 rounded-xl hover:bg-foreground/[0.02] transition-all group/line outline-none focus-within:bg-brand-purple/5 grid"
+            style={{ marginBottom: `${isInstrumental ? (settings.instrumentalGap ?? settings.lineGap ?? 0) : (settings.lineGap ?? 0)}px` }}
+          >
+            {/* Camada de Acordes (Visual) */}
+            <div className="col-start-1 row-start-1 w-full pointer-events-none select-none break-words whitespace-pre-wrap" style={{ ...fontStyle, color: 'transparent' }}>
+              {/* Usamos um espelho para saber onde cada caractere está */}
+              {plainText.split('').map((char, charIdx) => {
+                const chordAtThisChar = chords.find(c => c.offset === charIdx);
+                return (
+                  <span key={charIdx} className="relative">
+                    {char}
+                    {chordAtThisChar && (
+                      <div className="absolute -top-[1.65em] left-1/2 -translate-x-1/2 z-20 pointer-events-auto group/chord flex items-center">
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); moveChord(originalIdx, chordAtThisChar.partIdx, 'left'); }}
+                          className="absolute right-full mr-1 opacity-0 group-hover/chord:opacity-100 transition-all p-0.5 hover:bg-brand-purple/30 rounded bg-brand-purple/10 cursor-pointer"
+                        >
+                          <ChevronLeft className="w-3 h-3 text-brand-accent" />
+                        </button>
+
+                        <span
+                          contentEditable
+                          suppressContentEditableWarning
+                          spellCheck="false"
+                          onBlur={(e) => handlePartChange(originalIdx, chordAtThisChar.partIdx, e.currentTarget.innerText.trim(), true)}
+                          className={`px-1.5 py-0.5 rounded-md bg-brand-purple text-white font-black shadow-lg shadow-brand-purple/30 outline-none cursor-text transition-transform active:scale-95 ${settings.chords.font}`}
+                          style={{ fontSize: `${settings.chords.size * 0.75}px` }}
+                        >
+                          {isChord(chordAtThisChar.name) ? currentTransposeLine(chordAtThisChar.name, currentTranspose) : chordAtThisChar.name}
+                        </span>
+
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); moveChord(originalIdx, chordAtThisChar.partIdx, 'right'); }}
+                          className="absolute left-full ml-1 opacity-0 group-hover/chord:opacity-100 transition-all p-0.5 hover:bg-brand-purple/30 rounded bg-brand-purple/10 cursor-pointer"
+                        >
+                          <ChevronRight className="w-3 h-3 text-brand-accent" />
+                        </button>
+                      </div>
+                    )}
+                  </span>
+                );
+              })}
+
+              {/* Slot extra no fim */}
+              <span
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); handleContextMenu(e, originalIdx, isInsideChorus, plainText.length); }}
+                className="relative inline-block min-w-[2ch] pointer-events-auto cursor-context-menu"
+              >
+                &#8203;
+                {chords.find(c => c.offset >= plainText.length) && (
+                  <div className="absolute -top-[1.65em] left-1/2 -translate-x-1/2 flex items-center group/chord z-20">
+                    <button onMouseDown={(e) => moveChord(originalIdx, chords.find(c => c.offset >= plainText.length)!.partIdx, 'left')} className="opacity-0 group-hover/chord:opacity-100 p-0.5 rounded bg-brand-purple/10 cursor-pointer"><ChevronLeft className="w-3 h-3" /></button>
+                    <span
+                      contentEditable
+                      suppressContentEditableWarning
+                      spellCheck="false"
+                      onBlur={(e) => handlePartChange(originalIdx, chords.find(c => c.offset >= plainText.length)!.partIdx, e.currentTarget.innerText.trim(), true)}
+                      className={`px-1.5 py-0.5 rounded-md bg-brand-purple text-white font-black shadow-lg shadow-brand-purple/30 outline-none cursor-text transition-transform active:scale-95 ${settings.chords.font}`}
+                      style={{ fontSize: `${settings.chords.size * 0.75}px` }}
+                    >
+                      {isChord(chords.find(c => c.offset >= plainText.length)!.name) ? currentTransposeLine(chords.find(c => c.offset >= plainText.length)!.name, currentTranspose) : chords.find(c => c.offset >= plainText.length)!.name}
+                    </span>
+                    <button onMouseDown={(e) => moveChord(originalIdx, chords.find(c => c.offset >= plainText.length)!.partIdx, 'right')} className="opacity-0 group-hover/chord:opacity-100 p-0.5 rounded bg-brand-purple/10 cursor-pointer"><ChevronRight className="w-3 h-3" /></button>
+                  </div>
+                )}
+              </span>
+            </div>
+
+            {/* O TEXTAREA REAL (Invisível mas funcional) */}
+            <textarea
+              value={plainText}
+              spellCheck={false}
+              autoCorrect="off"
+              onContextMenu={(e) => {
+                const offset = e.currentTarget.selectionStart || 0;
+                handleContextMenu(e, originalIdx, isInsideChorus, offset);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleInsertLine(originalIdx);
+                }
+                if (e.key === 'Backspace' && plainText === '') {
+                  e.preventDefault();
+                  handleDeleteLine(originalIdx);
+                }
+              }}
+              onChange={(e) => {
+                const newValue = e.target.value.replace(/[\r\n]/g, '');
+                const oldValue = plainText;
+                const selectionStart = e.target.selectionStart;
+
+                // Heurística de Diff para "Sticky Chords"
+                let changePos = selectionStart;
+                const diff = newValue.length - oldValue.length;
+
+                // Se o diff for negativo (delete), a posição da mudança é o cursor atual
+                // Se for positivo (insert), a posição é cursor - diff
+                const startShiftIndex = diff > 0 ? selectionStart - diff : selectionStart;
+
+                handleLineUpdate(originalIdx, (old) => {
+                  const oldParts = old.split(/(\[.*?\])/g);
+                  let currentChords: { name: string, offset: number }[] = [];
+                  let offset = 0;
+                  oldParts.forEach(p => {
+                    if (p.startsWith('[') && p.endsWith(']')) {
+                      currentChords.push({ name: p, offset });
+                    } else {
+                      offset += p.length;
+                    }
+                  });
+
+                  // Ajusta os offsets dos acordes baseados no deslocamento do texto
+                  const adjustedChords = currentChords.map(c => {
+                    if (diff > 0) {
+                      // Inserção: Empurra acordes à frente ou na posição da inserção
+                      if (c.offset >= startShiftIndex) return { ...c, offset: c.offset + diff };
+                    } else if (diff < 0) {
+                      // Deleção: Puxa acordes à frente da deleção
+                      // Se o acorde estava EXATAMENTE no meio da área deletada, ele "encosta" no início da deleção
+                      if (c.offset > startShiftIndex + Math.abs(diff)) return { ...c, offset: c.offset + diff };
+                      if (c.offset > startShiftIndex) return { ...c, offset: startShiftIndex };
+                    }
+                    return c;
+                  });
+
+                  // Reconstrói o ChordPro
+                  let result = '';
+                  for (let i = 0; i <= newValue.length; i++) {
+                    // Insere todos os acordes que caíram neste offset (podem ser múltiplos se deletamos texto entre eles)
+                    adjustedChords.filter(c => c.offset === i).forEach(c => { result += c.name; });
+                    if (i < newValue.length) result += newValue[i];
+                  }
+                  return result;
+                });
+              }}
+              className="col-start-1 row-start-1 w-full h-full bg-transparent outline-none resize-none overflow-hidden block z-10 break-words whitespace-pre-wrap"
+              style={{
+                ...fontStyle,
+                color: getEffectiveColor(settings.lyrics.color),
+                caretColor: getEffectiveColor(settings.lyrics.color) // Mantém o cursor visível
+              }}
+            />
+          </div>
+        );
+      }
+
+      // --- MODO DE VISUALIZAÇÃO PADRÃO OU TEXTO ---
       const parts = line.split(/(\[.*?\])/g);
       let cumulativeOffset = 0;
       const tokens = parts.map((part, pIdx) => {
@@ -603,15 +862,17 @@ export default function SongView() {
         }
       }
 
+      const isInstrumental = line.replace(/\[.*?\]/g, '').trim() === '';
+
       return (
-        <div key={`chord-${originalIdx}`} className={`flex flex-wrap items-end min-h-[3em] group/line transition-all ${isEditing ? 'px-4 -mx-4 rounded-xl' : ''}`} onContextMenu={(e) => {
+        <div key={`chord-${originalIdx}`} className={`flex flex-wrap items-end min-h-[3em] group/line transition-all ${isEditing ? 'px-4 -mx-4 rounded-xl' : ''}`} style={{ marginBottom: `${isInstrumental ? (settings.instrumentalGap ?? settings.lineGap ?? 0) : (settings.lineGap ?? 0)}px` }} onContextMenu={(e) => {
           if (!isEditing) return;
           const cleanLineLength = line.replace(/\[.*?\]/g, '').length;
           handleContextMenu(e, originalIdx, isInsideChorus, cleanLineLength);
         }}>
           {merged.map((tok, idx) => (
-            <span key={`tok-${originalIdx}-${idx}`} className="inline-flex flex-col items-start relative group/chord pt-4">
-              <div className={`h-[1.5em] flex items-end relative w-full ${tok.hasChord ? 'pr-2' : ''}`} style={{ marginBottom: `${settings.chordLyricGap ?? 4}px` }}>
+            <span key={`tok-${originalIdx}-${idx}`} className={`inline-flex relative group/chord ${isInstrumental ? 'flex-row items-center pt-2' : 'flex-col items-start pt-4'}`}>
+              <div className={`flex items-end relative ${isInstrumental ? '' : 'h-[1.5em] w-full'} ${tok.hasChord && !isInstrumental ? 'pr-2' : ''}`} style={{ marginBottom: isInstrumental ? '0px' : `${settings.chordLyricGap ?? 4}px` }}>
                 {isEditing && tok.hasChord && (
                   <button onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); moveChord(originalIdx, tok.partIdx, 'left'); }} className="absolute right-full bottom-[2px] mr-1 opacity-0 group-hover/chord:opacity-100 transition-all p-1 hover:bg-brand-purple/30 rounded-md bg-brand-purple/10 z-10 shrink-0">
                     <ChevronLeft className="w-4 h-4 text-brand-accent" />
@@ -683,10 +944,11 @@ export default function SongView() {
         return;
       }
       setLoading(true);
-      const { data, error } = await (supabase.from('cromiasety_setlist') as any).select('*').eq('id', id).single();
+      const { data, error } = await (supabase.from('cromiasety_songs') as any).select('*').eq('id', id).single();
       if (data) {
         setSong(data);
         setEditedContent(data.content_raw || '');
+        setSongScrollSpeed(data.scroll_speed ?? data.settings?.scrollSpeed ?? 5);
       }
       if (error) console.error(error);
       setLoading(false);
@@ -712,14 +974,6 @@ export default function SongView() {
   }, [isEditing, history, redoHistory, editedContent]);
 
   useEffect(() => {
-    if (!song || !id) return;
-    const timeout = setTimeout(async () => {
-      try { await (supabase.from('cromiasety_setlist') as any).update({ settings }).eq('id', id); } catch (err) { console.error('Auto-save settings error:', err); }
-    }, 1000);
-    return () => clearTimeout(timeout);
-  }, [settings, id, song]);
-
-  useEffect(() => {
     if (!isScrolling) {
       if (scrollRef.current) cancelAnimationFrame(scrollRef.current);
       lastTimeRef.current = undefined;
@@ -730,7 +984,7 @@ export default function SongView() {
       if (lastTimeRef.current !== undefined) {
         const deltaTime = Math.min(time - lastTimeRef.current, 50);
         const speedMap = [0, 10, 18, 28, 42, 60, 85, 120, 165, 220, 300];
-        const pixelsPerSecond = speedMap[settings.scrollSpeed || 5] || 60;
+        const pixelsPerSecond = speedMap[songScrollSpeed] || 60;
         exactScrollY += pixelsPerSecond * (deltaTime / 1000);
         window.scrollTo(0, exactScrollY);
       }
@@ -739,17 +993,32 @@ export default function SongView() {
     };
     scrollRef.current = requestAnimationFrame(scrollLoop);
     return () => { if (scrollRef.current) cancelAnimationFrame(scrollRef.current); };
-  }, [isScrolling, settings.scrollSpeed]);
+  }, [isScrolling, songScrollSpeed]);
+
+  const updateSongScrollSpeed = async (newSpeed: number) => {
+    const clamped = Math.max(1, Math.min(10, newSpeed));
+    setSongScrollSpeed(clamped);
+    if (id && !id.startsWith('interval_') && song) {
+      try {
+        const { error } = await (supabase.from('cromiasety_songs') as any).update({ scroll_speed: clamped }).eq('id', id);
+        if (error) throw error;
+      } catch (err) {
+        try {
+          const newDBSettings = { ...(song.settings || {}), scrollSpeed: clamped };
+          await (supabase.from('cromiasety_songs') as any).update({ settings: newDBSettings }).eq('id', id);
+        } catch (e) { }
+      }
+    }
+  };
 
   // --- 7. Main Handlers ---
   const handleSaveEdit = async () => {
     try {
-      const { error } = await (supabase.from('cromiasety_setlist') as any).update({
+      const { error } = await (supabase.from('cromiasety_songs') as any).update({
         content_raw: editedContent,
         title: song.title,
         artist: song.artist,
-        observations: song.observations,
-        settings: settings
+        observations: song.observations
       }).eq('id', id);
       if (error) throw error;
       setSong({ ...song, content_raw: editedContent });
@@ -778,7 +1047,7 @@ export default function SongView() {
     }).filter(l => l !== null);
     const newContent = filtered.join('\n');
     try {
-      const { error } = await (supabase.from('musicbox_setlist') as any).update({ content_raw: newContent }).eq('id', id);
+      const { error } = await (supabase.from('cromiasety_songs') as any).update({ content_raw: newContent }).eq('id', id);
       if (error) throw error;
       setSong({ ...song, content_raw: newContent });
       setEditedContent(newContent);
@@ -788,6 +1057,65 @@ export default function SongView() {
   };
 
   // --- 8. Render Logic ---
+  const renderEditorContent = () => {
+    const lines = (isEditing ? editedContent : (song?.content_raw || '')).split('\n');
+    const mappedLines = lines.map((text: string, idx: number) => ({ text, originalIdx: idx }));
+
+    let filteredMapped = [...mappedLines];
+    if (!settings.showTabs && !isEditing) {
+      let currentBlock: number[] = [];
+      for (let i = 0; i <= mappedLines.length; i++) {
+        if (i < mappedLines.length && mappedLines[i].text.trim() !== '') {
+          currentBlock.push(i);
+        } else {
+          if (currentBlock.length > 0) {
+            const blockContent = currentBlock.map(idx => mappedLines[idx].text);
+            const hasTab = blockContent.some(l => /^[A-Ge]\|[-|0-9a-z ]+/i.test(l.trim()) || l.includes('---'));
+            const hasLyr = blockContent.some(l => /\[.*?\]/.test(l) && l.trim().split(/\[.*?\]/g).some((p: string) => p.trim().length > 0));
+            if (hasTab && !hasLyr) currentBlock.forEach(idx => { filteredMapped[idx] = null; });
+          }
+          currentBlock = [];
+        }
+      }
+    }
+
+    const finalLines = (filteredMapped.filter(l => l !== null) as any[]).filter((l, i, arr) => !(l.text.trim() === '' && i > 0 && arr[i - 1].text.trim() === ''));
+
+    const groups: any[] = [];
+    let currentChorus: any[] | null = null;
+    finalLines.forEach((lineObj) => {
+      const low = lineObj.text.trim().toLowerCase();
+      if (low === '{soc}' || low === '{start_of_chorus}') {
+        currentChorus = [];
+        if (groups.length > 0 && groups[groups.length - 1].type === 'line' && /^\[[^\]]+\]$/.test(groups[groups.length - 1].lines[0].text.trim())) {
+          currentChorus.push(groups.pop().lines[0]);
+        }
+      } else if (low === '{eoc}' || low === '{end_of_chorus}') {
+        if (currentChorus) { groups.push({ type: 'chorus', lines: currentChorus }); currentChorus = null; }
+      } else {
+        if (currentChorus) currentChorus.push(lineObj); else groups.push({ type: 'line', lines: [lineObj] });
+      }
+    });
+
+    return (
+      <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
+        {groups.flatMap((g, gi) => {
+          if (g.type === 'chorus') {
+            const showBrack = settings.showSections || isEditing;
+            return (
+              <div key={`chorus-${gi}`} className={`pl-6 ml-4 my-2 transition-all ${showBrack ? 'border-l-4' : 'border-l-0'}`} style={{ borderLeftColor: settings.sections?.color || '#a855f7' }}>
+                <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
+                  {g.lines.map((l: any) => renderLine(l.text, l.originalIdx, true))}
+                </div>
+              </div>
+            );
+          }
+          return g.lines.map((l: any) => renderLine(l.text, l.originalIdx, false));
+        })}
+      </div>
+    );
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center">
       <Loader2 className="w-12 h-12 text-brand-accent animate-spin mb-4" />
@@ -821,11 +1149,11 @@ export default function SongView() {
     <div className={`min-h-screen bg-background text-foreground font-sans transition-colors duration-300 ${isDarkMode ? 'dark' : 'light'} ${!isDarkMode && settings.isWarmWhite ? 'warm' : ''}`}>
       <header className="fixed top-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-sm border-b border-foreground/5 z-50 flex items-center justify-between px-6 shadow-xl ">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => {
               if (setlistId) navigate(`/setlists/${setlistId}`);
               else navigate(-1);
-            }} 
+            }}
             className="p-2 rounded-full hover:bg-foreground/5 transition-all"
           >
             <ArrowLeft className="w-6 h-6" />
@@ -844,49 +1172,60 @@ export default function SongView() {
             {!id?.startsWith('interval_') && <p className="text-xs text-foreground/50">{song?.artist}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={toggleTheme} className={`p-2.5 rounded-xl transition-all ${isDarkMode ? 'bg-yellow-500/10 text-yellow-500' : 'bg-brand-purple/10 text-brand-purple'}`}>
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-          <div className="relative flex items-center bg-foreground/5 rounded-xl p-1 border border-foreground/5 shadow-inner">
-            <button onClick={() => setSettings({ ...settings, scrollSpeed: Math.max(1, (settings.scrollSpeed || 5) - 1) })} className="p-2 hover:bg-foreground/10 rounded-lg"><Minus className="w-4 h-4" /></button>
-            <button onClick={() => setIsScrolling(!isScrolling)} className={`px-6 py-2 mx-1 rounded-lg transition-all ${isScrolling ? 'bg-brand-accent text-white' : 'hover:bg-foreground/10 text-foreground/80'}`}>
-              {isScrolling ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+        <div className="relative flex items-center bg-foreground/5 rounded-full p-2 border border-foreground/5 shadow-inner">
+          <button onClick={() => updateSongScrollSpeed(songScrollSpeed - 1)} className="p-2 hover:bg-foreground/10 rounded-full"><Minus className="w-5 h-5" /></button>
+          <div className="flex items-center gap-0 px-0">
+            <span className="text-lg w-5 ml-0 text-center font-bold text-foreground/50">{songScrollSpeed}</span>
+            <button onClick={() => setIsScrolling(!isScrolling)} className={`px-1 py-1 mx-1 rounded-full transition-all ${isScrolling ? 'bg-brand-accent text-white' : 'hover:bg-foreground/10 text-foreground/80'}`}>
+              {isScrolling ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current" />}
             </button>
-            <button onClick={() => setSettings({ ...settings, scrollSpeed: Math.min(10, (settings.scrollSpeed || 5) + 1) })} className="p-2 hover:bg-foreground/10 rounded-lg"><Plus className="w-4 h-4" /></button>
           </div>
+          <button onClick={() => updateSongScrollSpeed(songScrollSpeed + 1)} className="p-2 hover:bg-foreground/10 rounded-full"><Plus className="w-5 h-5" /></button>
+        </div>
+        <div className="flex items-center gap-2">
+
           {isEditing ? (
             <div className="flex items-center gap-1">
               <button
                 onClick={handleFetchMetadata}
                 disabled={isFetchingMetadata}
-                className={`p-2.5 rounded-xl transition-all flex items-center gap-2 mr-2 ${isFetchingMetadata ? 'bg-brand-purple/20 text-brand-accent animate-pulse' : 'hover:bg-brand-purple/10 text-brand-accent'}`}
-                title="Auto-Info (BPM/Tom)"
+                className={`p-2.5 rounded-xl transition-all flex items-center gap-2 mr-2 ${isFetchingMetadata ? 'bg-brand-purple/20 text-brand-accent transition-all' : 'hover:bg-brand-purple/10 text-brand-accent'}`}
+                title="BPM/TOM/CAPA"
               >
                 {isFetchingMetadata ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                <span className="text-xs font-bold hidden md:inline">
-                  {isFetchingMetadata ? 'Buscando...' : 'Auto-Info'}
+                <span className="text-sm font-bold hidden md:inline">
+                  {isFetchingMetadata ? 'Buscando...' : 'Atualizar Metadata'}
                 </span>
               </button>
               <button onClick={handleUndo} disabled={history.length === 0} className={`p-2 rounded-xl transition-all ${history.length === 0 ? 'opacity-20' : 'hover:bg-foreground/5 text-brand-accent'}`}><Undo2 className="w-5 h-5" /></button>
-              <button onClick={handleRedo} disabled={redoHistory.length === 0} className={`p-2 rounded-xl transition-all ${redoHistory.length === 0 ? 'opacity-20' : 'hover:bg-foreground/5 text-brand-accent'}`}><Redo2 className="w-5 h-5" /></button>
-              <button onClick={handleSaveEdit} className="px-6 py-2 bg-green-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 hover:bg-green-600 transition-all">Salvar</button>
-              <button onClick={handleCancel} className="px-4 py-2 bg-red-500/10 text-red-500 font-bold rounded-xl hover:bg-red-500 hover:text-white transition-all"> Cancelar</button>
+              <button onClick={handleRedo} disabled={redoHistory.length === 0} className={`p-2 rounded-xl transition-all ${redoHistory.length === 0 ? 'opacity-20' : 'hover:bg-foreground/5 text-brand-accent'}`}><Redo2 className="w-5 h-5 mr-4" /></button>
+              <button onClick={handleSaveEdit} title="Salvar" className="p-2.5 bg-green-500/20 text-green-500 rounded-full shadow-lg hover:bg-green-500 hover:text-white transition-all"><Check className="w-5 h-5" /></button>
+              <button onClick={handleCancel} title="Cancelar" className="p-2.5 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><X className="w-5 h-5" /></button>
             </div>
           ) : (
-            <button onClick={() => setIsEditing(true)} className="p-2.5 rounded-xl hover:bg-foreground/5 transition-all text-foreground/60"><Pencil className="w-5 h-5" /></button>
+            <button onClick={() => setIsEditing(true)} className="p-2.5 rounded-xl hover:bg-foreground/5 transition-all text-foreground/80"><Pencil className="w-5 h-5" /></button>
           )}
-          <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 rounded-xl bg-brand-purple text-white shadow-lg"><Settings className="w-5 h-5" /></button>
+          <button onClick={toggleTheme} className={`p-2.5 rounded-xl transition-all hover:bg-foreground/5 text-foreground/80`}>
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 rounded-xl text-foreground/80 transition-all hover:bg-foreground/5"><Settings className="w-5 h-5" /></button>
         </div>
       </header>
 
       {isSettingsOpen && (
         <div className="fixed inset-0 z-[100] flex justify-end">
-          <div className="absolute inset-0 bg-black/20" onClick={() => setIsSettingsOpen(false)} />
+          <div className="absolute inset-0 bg-black/0" onClick={() => setIsSettingsOpen(false)} />
           <div className={`relative w-full max-w-sm border-l shadow-2xl flex flex-col ${isDarkMode ? 'bg-[#0F0F1A]/95 text-white' : 'bg-white text-black'}`}>
             <div className="p-8 pb-4 flex items-center justify-between border-b border-foreground/5">
-              <div className="flex items-center gap-3"><Settings className="w-5 h-5 text-brand-accent" /><h3 className="text-xl font-bold">Configurações</h3></div>
-              <button onClick={() => setIsSettingsOpen(false)}><X className="w-5 h-5" /></button>
+              <div className="flex items-center gap-3">
+                <Settings className="w-5 h-5 text-brand-accent" />
+                <h3 className="text-xl font-bold">Configurações</h3>
+                <div className="flex items-center gap-1 ml-2">
+                  <button onClick={handleSettingsUndo} disabled={settingsHistory.length === 0} className={`p-1.5 rounded-lg transition-all ${settingsHistory.length === 0 ? 'opacity-20' : 'hover:bg-foreground/10 text-brand-accent'}`} title="Desfazer Configuração"><Undo2 className="w-4 h-4" /></button>
+                  <button onClick={handleSettingsRedo} disabled={settingsRedoHistory.length === 0} className={`p-1.5 rounded-lg transition-all ${settingsRedoHistory.length === 0 ? 'opacity-20' : 'hover:bg-foreground/10 text-brand-accent'}`} title="Refazer Configuração"><Redo2 className="w-4 h-4" /></button>
+                </div>
+              </div>
+              <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-foreground/5 rounded-full transition-all"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
               <div className="grid grid-cols-4 gap-2 mb-8">
@@ -899,7 +1238,7 @@ export default function SongView() {
                   </button>
                 ))}
               </div>
- 
+
               {!isDarkMode && (
                 <button
                   onClick={() => updateGlobalSetting('isWarmWhite', !settings.isWarmWhite)}
@@ -939,9 +1278,9 @@ export default function SongView() {
                   return (
                     <div key={el} className="p-4 rounded-2xl bg-foreground/5 border border-foreground/5 space-y-4 shadow-lg">
                       <p className="font-bold uppercase text-sm tracking-wide text-brand-accent">{t(`${el}_label`)}</p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2"><label className="text-xs uppercase opacity-40">{t('font_size')}</label><input type="range" min="10" max="80" value={s.size} onChange={(e) => updateSetting(el, 'size', parseInt(e.target.value))} className="w-full accent-brand-purple" /></div>
-                        <div className="space-y-2"><label className="text-xs uppercase opacity-40">{t('color')}</label><input type="color" value={s.color} onChange={(e) => updateSetting(el, 'color', e.target.value)} className="w-full h-8 p-0 bg-transparent border-none cursor-pointer rounded-lg" /></div>
+                      <div className="grid grid-cols-2 gap-4 justify-items-end">
+                        <div className="space-y-2"><label className="text-xs uppercase opacity-40">{t('font_size')}</label><input type="range" min="10" max="80" value={s.size} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateSetting(el, 'size', parseInt(e.target.value), false)} className="w-full accent-brand-purple" /></div>
+                        <div className="space-y-2"><label className="text-xs uppercase opacity-40"></label><input type="color" value={s.color} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateSetting(el, 'color', e.target.value, false)} className="w-10 h-10 p-0 bg-transparent border-none cursor-pointer" /></div>
                       </div>
                       <select value={s.font} onChange={(e) => updateSetting(el, 'font', e.target.value)} className="w-full bg-foreground/10 border-none rounded-xl px-3 py-2 text-sm">
                         {(el === 'tabs' ? tabFontOptions : fontOptions).map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
@@ -956,40 +1295,48 @@ export default function SongView() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs uppercase opacity-40">{t('header_gap')}</label>
-                    <input type="range" min="-20" max="20" value={settings.headerGap ?? 0} onChange={(e) => updateGlobalSetting('headerGap', parseInt(e.target.value))} className="w-full accent-brand-purple" />
+                    <input type="range" min="-20" max="20" value={settings.headerGap ?? 0} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('headerGap', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs uppercase opacity-40">{t('chord_lyric_gap')}</label>
-                    <input type="range" min="-10" max="10" value={settings.chordLyricGap ?? 4} onChange={(e) => updateGlobalSetting('chordLyricGap', parseInt(e.target.value))} className="w-full accent-brand-purple" />
+                    <input type="range" min="-20" max="10" value={settings.chordLyricGap ?? 4} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('chordLyricGap', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs uppercase opacity-40">{t('line_gap')}</label>
-                    <input type="range" min="0" max="40" value={settings.lineGap ?? 8} onChange={(e) => updateGlobalSetting('lineGap', parseInt(e.target.value))} className="w-full accent-brand-purple" />
+                    <input type="range" min="-24" max="20" value={settings.lineGap ?? 8} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('lineGap', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase opacity-40">{t('instrumental_gap')}</label>
+                    <input type="range" min="-24" max="30" value={settings.instrumentalGap ?? (settings.lineGap ?? 0)} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('instrumentalGap', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase opacity-40">{t('plain_line_gap')}</label>
+                    <input type="range" min="-24" max="20" value={settings.plainLineGap ?? 0} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('plainLineGap', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase opacity-40">{t('paragraph_gap')}</label>
+                    <input type="range" min="-20" max="70" value={settings.paragraphGap ?? 16} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('paragraphGap', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs uppercase opacity-40">{t('section_gap_top')}</label>
-                    <input type="range" min="0" max="60" value={settings.sectionGapTop ?? 12} onChange={(e) => updateGlobalSetting('sectionGapTop', parseInt(e.target.value))} className="w-full accent-brand-purple" />
+                    <input type="range" min="0" max="80" value={settings.sectionGapTop ?? 12} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('sectionGapTop', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs uppercase opacity-40">{t('metadata_gap_top')}</label>
-                    <input type="range" min="-10" max="40" value={settings.metadataGapTop ?? 8} onChange={(e) => updateGlobalSetting('metadataGapTop', parseInt(e.target.value))} className="w-full accent-brand-purple" />
+                    <input type="range" min="-10" max="40" value={settings.metadataGapTop ?? 8} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('metadataGapTop', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
                   </div>
                 </div>
               </div>
             </div>
-            <div className="p-8 border-t border-foreground/10 space-y-4">
-              <div className="flex gap-2">
-                <button onClick={handleSettingsUndo} disabled={settingsHistory.length === 0} className="flex-1 py-4 bg-brand-purple/10 text-brand-accent rounded-2xl font-bold flex items-center justify-center gap-2"><Undo2 className="w-4 h-4" /> Desfazer</button>
-                <button onClick={handleSettingsRedo} disabled={settingsRedoHistory.length === 0} className="flex-1 py-4 bg-brand-purple/10 text-brand-accent rounded-2xl font-bold flex items-center justify-center gap-2"><Redo2 className="w-4 h-4" /> Refazer</button>
-              </div>
-              <button onClick={() => setIsSettingsOpen(false)} className="w-full py-4 bg-brand-purple text-white rounded-2xl font-bold">OK</button>
+            <div className="p-5 border-t border-foreground/10 space-y-4">
+              <button onClick={() => setIsSettingsOpen(false)} className="w-[40%] flex justify-center mx-auto py-3 bg-brand-purple/70 text-white rounded-full font-bold hover:bg-brand-purple/100 scale-100 hover:scale-105 transition-all">OK</button>
             </div>
           </div>
         </div>
       )}
 
       <AnimatePresence mode="wait">
-        <motion.main 
+        <motion.main
           key={id}
           drag={setlistId ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
@@ -1009,7 +1356,7 @@ export default function SongView() {
             {id?.startsWith('interval_') ? (
               /* Página de Pausa */
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <motion.div 
+                <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   className="w-40 h-40 rounded-full bg-brand-purple/10 flex items-center justify-center mb-12 shadow-2xl shadow-brand-purple/20"
@@ -1030,13 +1377,13 @@ export default function SongView() {
               </div>
             ) : isEditing ? (
               <div className="space-y-4">
-                <input value={song?.title} onChange={(e) => setSong({ ...song, title: e.target.value })} className="text-5xl font-black bg-transparent border-b-2 border-brand-purple/30 w-full outline-none" />
-                <input value={song?.artist} onChange={(e) => setSong({ ...song, artist: e.target.value })} className="text-2xl text-brand-accent/60 bg-transparent border-b border-white/10 w-full outline-none" />
+                <input value={song?.title} onChange={(e) => setSong({ ...song, title: e.target.value })} className="text-5xl font-black bg-transparent w-full outline-none" />
+                <input value={song?.artist} onChange={(e) => setSong({ ...song, artist: e.target.value })} className="text-3xl font-bold text-foreground/50 bg-transparent w-full outline-none" />
                 <textarea
                   value={song?.observations || ''}
                   onChange={(e) => setSong({ ...song, observations: e.target.value })}
                   placeholder={t('observations_placeholder')}
-                  className="w-full bg-transparent border-b border-white/10 outline-none text-sm opacity-60 italic resize-none"
+                  className="w-full bg-transparent text-foreground/50  outline-none text-lg resize-none italic"
                   rows={2}
                 />
               </div>
@@ -1044,7 +1391,7 @@ export default function SongView() {
               <div className="flex items-start gap-8 ">
                 {settings.showArtwork && song?.artwork_url && <div className="w-32 h-32 mt-2 overflow-hidden shrink-0 shadow-[0_8px_20px_rgba(0,0,0,0.5)]"><img src={song.artwork_url} className="w-full h-full object-cover" /></div>}
                 <div className="flex-1 min-w-0">
-                  <h1 className={`font-black tracking-tighter ${settings.title.font}`} style={{ fontSize: `${settings.title.size}px`, color: getEffectiveColor(settings.title.color), marginBottom: `${settings.headerGap || 0}px`, lineHeight: '1.1' }}>{song?.title}</h1>
+                  <h1 className={`font-black tracking-tight ${settings.title.font}`} style={{ fontSize: `${settings.title.size}px`, color: getEffectiveColor(settings.title.color), marginBottom: `${settings.headerGap || 0}px`, lineHeight: '1.1' }}>{song?.title}</h1>
                   <h2 className={`font-bold opacity-80 tracking-tight ${settings.artist.font}`} style={{ fontSize: `${settings.artist.size}px`, color: getEffectiveColor(settings.artist.color), lineHeight: '1.2' }}>{song?.artist}</h2>
                   {settings.showMetadata && (song?.genre || song?.release_date || song?.album_name || song?.bpm || song?.key) && (
                     <div className={`flex flex-wrap gap-2 ${settings.metadata?.font || 'font-inter'} ${settings.metadata?.bold ? 'font-bold' : ''}`} style={{ fontSize: `${settings.metadata?.size || 10}px`, color: getEffectiveColor(settings.metadata?.color || '#ffffff'), marginTop: `${settings.metadataGapTop ?? 8}px` }}>
@@ -1067,73 +1414,43 @@ export default function SongView() {
 
           <div className="chord-sheet-container">
             {!id?.startsWith('interval_') && isEditing && (
-              <div className="flex gap-2 mb-6 p-1 bg-foreground/5 rounded-2xl w-fit">
-                <button onClick={() => setEditMode('live')} className={`px-6 py-2 rounded-xl ${editMode === 'live' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40'}`}>Edição Visual</button>
-                <button onClick={() => setEditMode('classic')} className={`px-6 py-2 rounded-xl ${editMode === 'classic' ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40'}`}>Modo Texto</button>
+              <div className="mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="flex gap-2 p-1 bg-foreground/5 rounded-2xl w-fit">
+                    <button onClick={() => { setEditMode('live'); setIsSplitMode(false); }} className={`px-6 py-2 rounded-xl font-bold transition-all ${editMode === 'live' && !isSplitMode ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40 hover:text-foreground/60'}`}>Edição Visual</button>
+                    <button onClick={() => { setEditMode('classic'); setIsSplitMode(false); }} className={`px-6 py-2 rounded-xl font-bold transition-all ${editMode === 'classic' && !isSplitMode ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40 hover:text-foreground/60'}`}>Modo Texto</button>
+                    <button onClick={() => { setEditMode('live'); setIsSplitMode(true); }} className={`px-6 py-2 rounded-xl font-bold transition-all ${isSplitMode ? 'bg-brand-purple text-white shadow-lg' : 'text-foreground/40 hover:text-foreground/60'}`}>Modo Split</button>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm text-foreground/50 italic max-w-2xl leading-relaxed mb-10">
+                  {isSplitMode ? 'O Modo Split permite editar visualmente à esquerda e ver o código ChordPro à direita simultaneamente.' : (editMode === 'live' ? t('visual_edition_instruction') : t('classic_mode_instruction'))}
+                </p>
               </div>
             )}
-            {!id?.startsWith('interval_') && (isEditing && editMode === 'classic' ? 
-              <textarea value={editedContent} onChange={(e) => setEditedContent(e.target.value)} className="w-full min-h-[60vh] bg-foreground/5 p-8 rounded-3xl font-mono outline-none border border-foreground/10" />
-            : 
+
+            {!id?.startsWith('interval_') && (isEditing && isSplitMode ? (
+              <div className="grid grid-cols-2 gap-8 items-start">
+                <div className="space-y-4">
+                  <h3 className="text-xs uppercase font-black tracking-widest text-brand-purple opacity-50 mb-4">Visual</h3>
+                  <div key={revision} className="leading-relaxed editing-mode cursor-text">
+                    {renderEditorContent()}
+                  </div>
+                </div>
+                <div className="space-y-4 h-full">
+                  <h3 className="text-xs uppercase font-black tracking-widest text-brand-purple opacity-50 mb-4">ChordPro</h3>
+                  <textarea
+                    value={editedContent}
+                    onChange={handleTextareaChange}
+                    onContextMenu={handleTextareaContextMenu}
+                    className="w-full min-h-[60vh] h-full bg-foreground/5 p-8 rounded-3xl font-mono outline-none border border-foreground/10 text-sm"
+                  />
+                </div>
+              </div>
+            ) : isEditing && editMode === 'classic' ?
+              <textarea value={editedContent} onChange={handleTextareaChange} onContextMenu={handleTextareaContextMenu} className="w-full min-h-[60vh] bg-foreground/5 p-8 rounded-3xl font-mono outline-none border border-foreground/10" />
+              :
               <div key={revision} className={`leading-relaxed ${isEditing ? 'editing-mode cursor-text' : ''}`}>
-                {(() => {
-                  const lines = (isEditing ? editedContent : (song?.content_raw || '')).split('\n');
-                  const mappedLines = lines.map((text: string, idx: number) => ({ text, originalIdx: idx }));
-
-                  let filteredMapped = [...mappedLines];
-                  if (!settings.showTabs && !isEditing) {
-                    let currentBlock: number[] = [];
-                    for (let i = 0; i <= mappedLines.length; i++) {
-                      if (i < mappedLines.length && mappedLines[i].text.trim() !== '') {
-                        currentBlock.push(i);
-                      } else {
-                        if (currentBlock.length > 0) {
-                          const blockContent = currentBlock.map(idx => mappedLines[idx].text);
-                          const hasTab = blockContent.some(l => /^[A-Ge]\|[-|0-9a-z ]+/i.test(l.trim()) || l.includes('---'));
-                          const hasLyr = blockContent.some(l => /\[.*?\]/.test(l) && l.trim().split(/\[.*?\]/g).some((p: string) => p.trim().length > 0));
-                          if (hasTab && !hasLyr) currentBlock.forEach(idx => { filteredMapped[idx] = null; });
-                        }
-                        currentBlock = [];
-                      }
-                    }
-                  }
-
-                  const finalLines = (filteredMapped.filter(l => l !== null) as any[]).filter((l, i, arr) => !(l.text.trim() === '' && i > 0 && arr[i - 1].text.trim() === ''));
-
-                  const groups: any[] = [];
-                  let currentChorus: any[] | null = null;
-                  finalLines.forEach((lineObj) => {
-                    const low = lineObj.text.trim().toLowerCase();
-                    if (low === '{soc}' || low === '{start_of_chorus}') {
-                      currentChorus = [];
-                      if (groups.length > 0 && groups[groups.length - 1].type === 'line' && /^\[[^\]]+\]$/.test(groups[groups.length - 1].lines[0].text.trim())) {
-                        currentChorus.push(groups.pop().lines[0]);
-                      }
-                    } else if (low === '{eoc}' || low === '{end_of_chorus}') {
-                      if (currentChorus) { groups.push({ type: 'chorus', lines: currentChorus }); currentChorus = null; }
-                    } else {
-                      if (currentChorus) currentChorus.push(lineObj); else groups.push({ type: 'line', lines: [lineObj] });
-                    }
-                  });
-
-                  return (
-                    <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
-                      {groups.flatMap((g, gi) => {
-                        if (g.type === 'chorus') {
-                          const showBrack = settings.showSections || isEditing;
-                          return (
-                            <div key={`chorus-${gi}`} className={`pl-6 ml-4 my-2 transition-all ${showBrack ? 'border-l-4' : 'border-l-0'}`} style={{ borderLeftColor: settings.sections?.color || '#a855f7' }}>
-                              <div className="flex flex-col" style={{ gap: `${settings.lineGap ?? 8}px` }}>
-                                {g.lines.map((l: any) => renderLine(l.text, l.originalIdx, true))}
-                              </div>
-                            </div>
-                          );
-                        }
-                        return g.lines.map((l: any) => renderLine(l.text, l.originalIdx, false));
-                      })}
-                    </div>
-                  );
-                })()}
+                {renderEditorContent()}
               </div>
             )}
           </div>
@@ -1147,6 +1464,15 @@ export default function SongView() {
           <button onClick={() => { addChordToLine(contextMenu.lineIdx, contextMenu.charOffset); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all hover:bg-brand-purple/10 text-foreground/80 hover:text-brand-purple">
             <div className="p-2 rounded-lg bg-brand-purple/5"><PlusCircle className="w-4 h-4" /></div><span className="font-medium">Inserir Acorde Aqui</span>
           </button>
+
+          <div className="px-3 py-2 mt-2 text-[10px] font-bold text-foreground/40 uppercase tracking-widest border-b border-foreground/5 mb-1">Símbolos de Compasso</div>
+          <div className="grid grid-cols-7 gap-1 px-2 pb-2 mt-2">
+            {['|', '│', 'ǁ', '║', '|:', ':|', '-'].map(symbol => (
+              <button key={symbol} onClick={() => { addChordToLine(contextMenu.lineIdx, contextMenu.charOffset, symbol); setContextMenu(null); }} className="flex items-center justify-center py-2 rounded-lg bg-foreground/5 hover:bg-brand-purple/10 hover:text-brand-purple transition-all font-mono font-bold">
+                {symbol}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {contextMenu && <div className="fixed inset-0 z-[90]" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />}

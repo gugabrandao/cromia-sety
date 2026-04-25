@@ -1,21 +1,24 @@
 import { useTranslation } from 'react-i18next';
 import {
   Music2, Mic2, Plus, Play, ArrowRight, Guitar, Drum,
-  Trash2, SearchIcon
+  Trash2, SearchIcon, Smile
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useState, useEffect } from 'react';
 import setyLogo from '../assets/sety logo branca.svg';
+import SearchModal from '../components/SearchModal';
 
 function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [recentSongs, setRecentSongs] = useState<any[]>([]);
+  const [userName, setUserName] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const fetchSongs = async () => {
     const { data } = await supabase
-      .from('cromiasety_setlist')
+      .from('cromiasety_songs')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(7);
@@ -25,6 +28,11 @@ function Dashboard() {
 
   useEffect(() => {
     fetchSongs();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.user_metadata?.full_name) {
+        setUserName(user.user_metadata.full_name.split(' ')[0]);
+      }
+    });
   }, []);
 
   const handleDeleteSong = async (e: React.MouseEvent, id: string) => {
@@ -32,12 +40,18 @@ function Dashboard() {
     if (!confirm('Tem certeza que deseja remover esta música?')) return;
 
     try {
-      const { error } = await supabase
-        .from('cromiasety_setlist')
+      const { data, error } = await supabase
+        .from('cromiasety_songs')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        alert('A música não pôde ser apagada. Isso pode ocorrer por falta de permissão (RLS) ou se a música não foi criada pela sua conta.');
+        return;
+      }
 
       // Update local state
       setRecentSongs(prev => prev.filter(s => s.id !== id));
@@ -77,7 +91,7 @@ function Dashboard() {
             <button
               onClick={async () => {
                 const { data: { user } } = await supabase.auth.getUser();
-                const { data, error: _error } = await (supabase.from('cromiasety_setlist') as any).insert({
+                const { data, error: _error } = await (supabase.from('cromiasety_songs') as any).insert({
                   user_id: user?.id,
                   title: 'Nova Cifra',
                   artist: 'Artista Desconhecido',
@@ -92,11 +106,11 @@ function Dashboard() {
               Criar Cifra
             </button>
             <button
-              onClick={() => navigate('/search')}
+              onClick={() => setIsSearchOpen(true)}
               className="px-6 py-3 rounded-full bg-brand-purple text-white font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-purple/20"
             >
               <SearchIcon className="w-5 h-5" />
-              {t('new_setlist')}
+              Buscar Cifra
             </button>
           </div>
         </header>
@@ -105,7 +119,9 @@ function Dashboard() {
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <div className="md:col-span-2 glass-card rounded-3xl p-8 relative overflow-hidden group animate-fade-in [animation-delay:100ms]">
             <div className="relative z-10">
-              <span className="px-3 py-1 rounded-full bg-brand-purple/20 text-brand-accent text-xs font-bold uppercase tracking-wider mb-4 inline-block">{t('featured')}</span>
+              <p className="text-4xl font-bold text-brand-accent mb-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                {userName ? `Oi, ${userName}! ` : ''}Bora tocar? <Guitar className="w-10 h-10 inline-block mb-4 ml-2" />
+              </p>
               <h2 className="text-5xl font-black mb-4 leading-tight text-foreground">{t('hero_title')}</h2>
               <p className="text-foreground/60 text-lg mb-8 max-w-md">
                 {t('hero_subtitle')}
@@ -205,26 +221,16 @@ function Dashboard() {
           )}
 
           <div
-            onClick={async () => {
-              const { data: { user } } = await supabase.auth.getUser();
-              const { data, error: _error } = await (supabase.from('cromiasety_setlist') as any).insert({
-                user_id: user?.id,
-                title: 'Nova Cifra',
-                artist: 'Artista Desconhecido',
-                content_raw: '[C]\nNova música para o seu repertório.',
-                fetch_status: 'success'
-              }).select().single();
-              if (data) navigate(`/song/${data.id}`);
-            }}
+            onClick={() => setIsSearchOpen(true)}
             className="glass group cursor-pointer rounded-2xl p-4 border border-dashed border-foreground/20 hover:border-brand-purple transition-all hover:translate-y-[-4px] relative flex flex-col"
           >
             <div className="aspect-square rounded-xl bg-brand-purple/5 mb-4 flex flex-col items-center justify-center border-2 border-dashed border-brand-purple/20 group-hover:bg-brand-purple/10 transition-all">
-              <Plus className="w-20 h-20 text-brand-purple opacity-70 group-hover:scale-110 transition-transform" />
+              <SearchIcon className="w-20 h-20 text-brand-purple opacity-70 group-hover:scale-110 transition-transform" />
             </div>
-            <h4 className="font-bold mb-1 text-foreground">Criar Cifra</h4>
-            <p className="text-xs text-foreground/40 mb-3">Começar do zero</p>
+            <h4 className="font-bold mb-1 text-foreground">Buscar Música</h4>
+            <p className="text-xs text-foreground/40 mb-3">Importar do CifraClub</p>
             <div className="flex gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-brand-purple/10 text-brand-accent text-[10px] font-bold uppercase">NOVA</span>
+              <span className="px-2 py-0.5 rounded-md bg-brand-purple/10 text-brand-accent text-[10px] font-bold uppercase">IMPORTAR</span>
             </div>
           </div>
         </div>
@@ -270,6 +276,12 @@ function Dashboard() {
           </div>
         </section>
       </div>
+
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSongAdded={() => fetchSongs()}
+      />
     </div>
   );
 }

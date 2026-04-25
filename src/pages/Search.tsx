@@ -75,7 +75,7 @@ export default function Search() {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || '00000000-0000-0000-0000-000000000000';
 
-      const { error } = await supabase.from('cromiasety_setlist').insert({
+      const { error } = await supabase.from('cromiasety_songs').insert({
         user_id: userId,
         title: simplified ? `${captured.title} (Simplificada)` : captured.title,
         artist: captured.artist,

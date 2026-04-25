@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Search, Play, Settings2, Moon, Guitar, Activity, Settings, Loader2, Save, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSongMetadata } from '../services/spotifyService';
+import SearchModal from '../components/SearchModal';
 
 export default function SetlistView() {
   const { t } = useTranslation();
@@ -13,6 +14,7 @@ export default function SetlistView() {
   const [songs, setSongs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Edit Config States
   const [editingSong, setEditingSong] = useState<any>(null);
@@ -38,18 +40,19 @@ export default function SetlistView() {
   }, [palcoConfig]);
 
   // Fetch Songs
-  useEffect(() => {
-    async function fetchSongs() {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('cromiasety_setlist')
-        .select('*')
-        .order('title', { ascending: true });
+  const fetchSongs = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('cromiasety_songs')
+      .select('*')
+      .order('title', { ascending: true });
 
-      if (data) setSongs(data);
-      if (error) console.error("Error fetching songs:", error);
-      setIsLoading(false);
-    }
+    if (data) setSongs(data);
+    if (error) console.error("Error fetching songs:", error);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
     fetchSongs();
   }, []);
 
@@ -83,12 +86,19 @@ export default function SetlistView() {
     if (!confirm('Tem certeza que deseja remover esta música do seu repertório?')) return;
 
     try {
-      const { error: _error } = await supabase
-        .from('cromiasety_setlist')
+      const { data, error: _error } = await supabase
+        .from('cromiasety_songs')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (_error) throw _error;
+      
+      if (!data || data.length === 0) {
+        alert('A música não pôde ser apagada do banco de dados. Isso geralmente acontece por falta de permissão (RLS) se a cifra foi importada com um ID de usuário diferente do seu.');
+        return;
+      }
+      
       setSongs(prev => prev.filter(s => s.id !== id));
     } catch (err) {
       console.error('Error deleting song:', err);
@@ -103,7 +113,7 @@ export default function SetlistView() {
     setIsSaving(true);
     try {
       const { error } = await (supabase as any)
-        .from('cromiasety_setlist')
+        .from('cromiasety_songs')
         .update({
           title: editingSong.title,
           artist: editingSong.artist,
@@ -235,7 +245,7 @@ export default function SetlistView() {
         <button
           onClick={async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            const { data, error: _error } = await (supabase.from('cromiasety_setlist') as any).insert({
+            const { data, error: _error } = await (supabase.from('cromiasety_songs') as any).insert({
               user_id: user?.id,
               title: 'Nova Cifra',
               artist: 'Artista Desconhecido',
@@ -251,11 +261,11 @@ export default function SetlistView() {
         </button>
 
         <button
-          onClick={() => setIsPalcoMode(true)}
-          className="flex items-center justify-center gap-3 px-8 py-4 bg-foreground text-background rounded-full font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-foreground/20"
+          onClick={() => setIsSearchOpen(true)}
+          className="flex items-center justify-center gap-3 px-8 py-4 bg-brand-accent text-white rounded-full font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-accent/20"
         >
-          <Moon className="w-5 h-5" fill="currentColor" />
-          {t('stage_mode').toUpperCase()}
+          <Search className="w-5 h-5" />
+          BUSCAR CIFRA
         </button>
       </div>
 
@@ -486,6 +496,12 @@ export default function SetlistView() {
           </div>
         </div>
       )}
+
+      <SearchModal 
+        isOpen={isSearchOpen} 
+        onClose={() => setIsSearchOpen(false)}
+        onSongAdded={() => fetchSongs()}
+      />
     </div>
   );
 }

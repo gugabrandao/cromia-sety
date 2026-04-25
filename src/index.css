@@ -99,7 +99,20 @@
   }
 
   .glass-card {
-    @apply bg-foreground/[0.02] backdrop-blur-xl border border-foreground/[0.05] shadow-2xl transition-all;
+    @apply bg-background/40 backdrop-blur-2xl border border-white/5 shadow-2xl;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-foreground/10 rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-brand-purple/40;
   }
 
   .dark .glass {
@@ -109,24 +122,6 @@
   .dark .glass-card {
     @apply bg-white/[0.02] border-white/[0.05];
   }
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(168, 85, 247, 0.3);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(168, 85, 247, 0.5);
 }
 
 /* Chord Viewer Styles */

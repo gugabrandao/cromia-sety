@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
+import SettingsModal from './SettingsModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,20 @@ export default function Layout({ children }: LayoutProps) {
   const { t, i18n } = useTranslation();
   const { toggleTheme, isDarkMode } = useTheme();
   const navigate = useNavigate();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setAvatarUrl(user?.user_metadata?.avatar_url || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAvatarUrl(session?.user?.user_metadata?.avatar_url || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
     if (!confirm('Deseja realmente sair?')) return;
@@ -34,7 +49,24 @@ export default function Layout({ children }: LayoutProps) {
   const isSongView = location.pathname.startsWith('/song/');
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
+      {/* Global Watermark Background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] md:w-[1920px] md:h-[1700px] bg-foreground opacity-[0.02] dark:opacity-[0.008]"
+          style={{
+            WebkitMaskImage: `url("${setyLogo}")`,
+            WebkitMaskSize: 'contain',
+            WebkitMaskRepeat: 'no-repeat',
+            WebkitMaskPosition: 'center',
+            maskImage: `url("${setyLogo}")`,
+            maskSize: 'contain',
+            maskRepeat: 'no-repeat',
+            maskPosition: 'center'
+          }}
+        />
+      </div>
+
       {/* Sidebar */}
       {!isSongView && (
         <aside className="fixed left-0 top-0 h-full w-20 flex flex-col items-center py-8 bg-foreground/5 border-r border-foreground/5 backdrop-blur-xl z-[100] transition-colors duration-300">
@@ -48,7 +80,7 @@ export default function Layout({ children }: LayoutProps) {
           <nav className="flex-1 flex flex-col gap-8">
             <button
               onClick={() => navigate('/')}
-              className={`p-3 rounded-xl transition-all group relative ${isActive('/') ? 'bg-brand-purple/20 text-brand-accent' : 'text-foreground/40 hover:text-brand-purple'}`}
+              className={`p-3 rounded-full transition-all group relative ${isActive('/') ? 'bg-brand-purple/20 text-brand-accent' : 'text-foreground/40 hover:text-brand-purple'}`}
             >
               <LayoutDashboard className="w-6 h-6" />
               <span className="absolute left-full ml-4 px-2 py-1 bg-brand-purple text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">{t('dashboard')}</span>
@@ -56,7 +88,7 @@ export default function Layout({ children }: LayoutProps) {
 
             <button
               onClick={() => navigate('/repertorio')}
-              className={`p-3 rounded-xl transition-all group relative ${isActive('/repertorio') || isActive('/setlist') ? 'bg-brand-purple/20 text-brand-accent' : 'text-foreground/40 hover:text-brand-purple'}`}
+              className={`p-3 rounded-full transition-all group relative ${isActive('/repertorio') || isActive('/setlist') ? 'bg-brand-purple/20 text-brand-accent' : 'text-foreground/40 hover:text-brand-purple'}`}
             >
               <ListMusic className="w-6 h-6" />
               <span className="absolute left-full ml-4 px-2 py-1 bg-brand-purple text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Minhas Cifras</span>
@@ -64,7 +96,7 @@ export default function Layout({ children }: LayoutProps) {
 
             <button
               onClick={() => navigate('/setlists')}
-              className={`p-3 rounded-xl transition-all group relative ${location.pathname.startsWith('/setlists') ? 'bg-brand-purple/20 text-brand-accent' : 'text-foreground/40 hover:text-brand-purple'}`}
+              className={`p-3 rounded-full transition-all group relative ${location.pathname.startsWith('/setlists') ? 'bg-brand-purple/20 text-brand-accent' : 'text-foreground/40 hover:text-brand-purple'}`}
             >
               <Mic2 className="w-6 h-6" />
               <span className="absolute left-full ml-4 px-2 py-1 bg-brand-purple text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Meus Setlists</span>
@@ -80,37 +112,50 @@ export default function Layout({ children }: LayoutProps) {
               className="p-3 rounded-full flex items-center justify-center hover:bg-foreground/5 transition-all text-foreground/40 hover:text-brand-purple"
               title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
             >
-              {isDarkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5" />}
+              {isDarkMode ? <Sun className="w-6 h-6 text-foreground/40 transition-all hover:text-brand-purple" /> : <Moon className="w-6 h-6" />}
             </button>
 
             {/* Language Switcher */}
             <button
               onClick={toggleLanguage}
-              className="flex flex-col items-center justify-center hover:bg-foreground/5 transition-all text-foreground/40 hover:text-brand-purple group relative p-2 rounded-xl"
+              className="flex flex-col items-center justify-center hover:bg-foreground/5 transition-all text-foreground/40 hover:text-brand-purple group relative p-1 rounded-full"
               title="Change Language"
             >
               <Globe className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] font-bold uppercase">{i18n.language?.startsWith('pt') ? 'PT' : 'EN'}</span>
             </button>
 
-            <button className="p-3 rounded-xl text-foreground/40 hover:text-brand-purple transition-all">
-              <Settings className="w-6 h-6" />
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-10 h-10 rounded-full bg-foreground/5 border border-foreground/5 flex items-center justify-center hover:scale-105 hover:border-brand-purple/50 transition-all group relative"
+            >
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-full" />
+              ) : (
+                <User className="w-5 h-5 text-foreground/40 group-hover:text-brand-purple transition-colors" />
+              )}
+              <span className="absolute left-full ml-4 px-2 py-1 bg-brand-purple text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Perfil</span>
             </button>
 
-            <button 
+            <button
               onClick={handleLogout}
-              className="w-10 h-10 rounded-full bg-foreground/5 border border-foreground/5 flex items-center justify-center overflow-hidden hover:bg-red-500/10 hover:border-red-500/20 text-foreground/40 hover:text-red-500 transition-all group relative"
+              className="p-3 rounded-full text-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-all group relative"
             >
-              <User className="w-5 h-5 group-hover:hidden" />
-              <LogOut className="w-5 h-5 hidden group-hover:block" />
+              <LogOut className="w-6 h-6 pl-1" />
               <span className="absolute left-full ml-4 px-2 py-1 bg-red-500 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Sair</span>
             </button>
           </div>
         </aside>
       )}
 
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+
+
       {/* Page Content */}
-      <main className={`${!isSongView ? 'pl-20' : ''} min-h-screen`}>
+      <main className={`${!isSongView ? 'pl-20' : ''} min-h-screen relative z-10`}>
         {children}
       </main>
     </div>

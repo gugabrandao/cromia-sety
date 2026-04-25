@@ -69,8 +69,6 @@ export const chordService = {
           }
         });
 
-
-
         return Array.from(uniqueSongs.values()).slice(0, 10);
       }
 

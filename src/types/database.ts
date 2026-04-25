@@ -9,7 +9,7 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      cromiasety_setlist: {
+      cromiasety_songs: {
         Row: {
           id: string
           user_id: string
