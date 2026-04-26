@@ -7,14 +7,14 @@ import { supabase } from './lib/supabase'
 
 // Pages
 import Dashboard from './pages/Dashboard'
-import Search from './pages/Search'
-import SongView from './pages/SongView'
+import Busca from './pages/Busca'
+import Cifras from './pages/Cifras'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 
-import SetlistView from './pages/SetlistView'
-import SetlistManager from './pages/SetlistManager'
-import SetlistDetailView from './pages/SetlistDetailView'
+import MinhasCifras from './pages/MinhasCifras'
+import MeusSetlists from './pages/MeusSetlists'
+import Setlist from './pages/Setlist'
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -57,11 +57,11 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/repertorio" element={<SetlistView />} />
-          <Route path="/setlists" element={<SetlistManager />} />
-          <Route path="/setlists/:id" element={<SetlistDetailView />} />
-          <Route path="/song/:id" element={<SongView />} />
-          <Route path="/search" element={<Search />} />
+          <Route path="/repertorio" element={<MinhasCifras />} />
+          <Route path="/setlists" element={<MeusSetlists />} />
+          <Route path="/setlists/:id" element={<Setlist />} />
+          <Route path="/song/:id" element={<Cifras />} />
+          <Route path="/search" element={<Busca />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

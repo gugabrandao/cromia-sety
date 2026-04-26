@@ -7,7 +7,7 @@ import type { SongResult } from '../services/chordService';
 import { supabase } from '../lib/supabase';
 import { fetchSongMetadata } from '../services/spotifyService';
 
-export default function Search() {
+export default function Busca() {
   const { t } = useTranslation();
 
   const [query, setQuery] = useState('');

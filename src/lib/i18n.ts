@@ -199,7 +199,7 @@ i18n
           tabs_label: 'Tabs',
           switch_to_light: 'Mudar para Tema Claro',
           switch_to_dark: 'Mudar para Tema Escuro',
-          my_repertoire: 'Minhas Músicas',
+          my_repertoire: 'Minhas Cifras',
           manage_repertoire_desc: 'Gerencie e organize todas as suas músicas.',
           search_song_artist: 'Buscar música ou artista...',
           alphabetical_order: 'Ordem Alfabética',

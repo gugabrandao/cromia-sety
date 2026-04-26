@@ -55,7 +55,7 @@ function SortableItem({ id, children }: { id: string, children: React.ReactNode 
   );
 }
 
-export default function SetlistDetailView() {
+export default function Setlist() {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();

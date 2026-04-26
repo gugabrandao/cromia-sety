@@ -4,7 +4,7 @@ import { Plus, Mic2, Calendar, MapPin, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-export default function SetlistManager() {
+export default function MeusSetlists() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [setlists, setSetlists] = useState<any[]>([]);

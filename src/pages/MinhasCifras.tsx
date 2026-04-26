@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
-import { Search, Play, Settings2, Guitar, Activity, Settings, Loader2, Save, Plus, Trash2 } from 'lucide-react';
+import { Search, Play, Settings2, Guitar, Activity, Settings, Loader2, Save, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSongMetadata } from '../services/spotifyService';
 import SearchModal from '../components/SearchModal';
 
-export default function SetlistView() {
+export default function MinhasCifras() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -15,6 +15,7 @@ export default function SetlistView() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'title' | 'artist' | 'observations'>('title');
 
   // Edit Config States
   const [editingSong, setEditingSong] = useState<any>(null);
@@ -56,15 +57,38 @@ export default function SetlistView() {
     fetchSongs();
   }, []);
 
-  // Filter Songs
+  // Filter & Sort Songs
   const filteredSongs = useMemo(() => {
-    if (!searchQuery.trim()) return songs;
-    const query = searchQuery.toLowerCase();
-    return songs.filter(song =>
-      song.title.toLowerCase().includes(query) ||
-      song.artist.toLowerCase().includes(query)
-    );
-  }, [songs, searchQuery]);
+    let result = songs;
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(song =>
+        song.title?.toLowerCase().includes(query) ||
+        song.artist?.toLowerCase().includes(query) ||
+        song.observations?.toLowerCase().includes(query)
+      );
+    }
+
+    result = [...result].sort((a, b) => {
+      if (sortBy === 'title') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      if (sortBy === 'artist') {
+        return (a.artist || '').localeCompare(b.artist || '');
+      }
+      if (sortBy === 'observations') {
+        const aObs = a.observations || '';
+        const bObs = b.observations || '';
+        if (aObs && !bObs) return -1;
+        if (!aObs && bObs) return 1;
+        return aObs.localeCompare(bObs);
+      }
+      return 0;
+    });
+
+    return result;
+  }, [songs, searchQuery, sortBy]);
 
   // Funções de conversão de tempo
   const msToTime = (ms: number | null) => {
@@ -242,51 +266,68 @@ export default function SetlistView() {
           <p className="text-foreground/50 text-lg">{t('manage_repertoire_desc')}</p>
         </div>
 
-        <button
-          onClick={async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            const { data, error: _error } = await (supabase.from('cromiasety_songs') as any).insert({
-              user_id: user?.id,
-              title: 'Nova Cifra',
-              artist: 'Artista Desconhecido',
-              content_raw: '[C]\nNova música para o seu repertório.',
-              fetch_status: 'success'
-            }).select().single();
-            if (data) navigate(`/song/${(data as any).id}`);
-          }}
-          className="flex items-center justify-center gap-3 px-8 py-4 bg-brand-purple text-white rounded-full font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-purple/20"
-        >
-          <Plus className="w-5 h-5" />
-          CRIAR CIFRA
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={async () => {
+              const { data: { user } } = await supabase.auth.getUser();
+              const { data, error: _error } = await (supabase.from('cromiasety_songs') as any).insert({
+                user_id: user?.id,
+                title: 'Nova Cifra',
+                artist: 'Artista Desconhecido',
+                content_raw: '[C]\nNova música para o seu repertório.',
+                fetch_status: 'success'
+              }).select().single();
+              if (data) navigate(`/song/${(data as any).id}`);
+            }}
+            className="px-6 py-3 rounded-full bg-brand-purple text-white font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-purple/20"
+          >
+            <Plus className="w-5 h-5" />
+            Criar Cifra
+          </button>
 
-        <button
-          onClick={() => setIsSearchOpen(true)}
-          className="flex items-center justify-center gap-3 px-8 py-4 bg-brand-accent text-white rounded-full font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-accent/20"
-        >
-          <Search className="w-5 h-5" />
-          BUSCAR CIFRA
-        </button>
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="px-6 py-3 rounded-full bg-brand-purple text-white font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-purple/20"
+          >
+            <Search className="w-5 h-5" />
+            Buscar Cifra
+          </button>
+        </div>
       </div>
 
       {/* Search & Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
+      <div className="flex flex-col md:flex-row gap-4 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
           <input
             type="text"
-            placeholder={t('search_song_artist')}
+            placeholder="Buscar por título, artista ou observações..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-4 pl-14 pr-6 focus:outline-none focus:ring-2 focus:ring-brand-purple/50 font-medium transition-all"
           />
         </div>
-        <div className="flex gap-2">
-          {/* Espaço para futuros botões de ordenação (Tags, Energia) */}
-          <button className="px-6 py-4 rounded-2xl bg-foreground/5 text-foreground/60 font-bold hover:bg-foreground/10 transition-colors">
-            {t('alphabetical_order')}
-          </button>
+        <div className="relative shrink-0 min-w-[200px]">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="w-full appearance-none bg-foreground/5 border border-foreground/10 text-foreground font-bold rounded-2xl py-4 pl-6 pr-12 focus:outline-none focus:ring-2 focus:ring-brand-purple/50 focus:border-brand-purple transition-all cursor-pointer"
+          >
+            <option value="title" className="bg-background text-foreground">Alfabética</option>
+            <option value="artist" className="bg-background text-foreground">Por Artista</option>
+            <option value="observations" className="bg-background text-foreground">Com Observações</option>
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
+            <ChevronDown className="w-5 h-5" />
+          </div>
         </div>
+      </div>
+      
+      {/* Total Badge */}
+      <div className="mb-6 flex">
+        <span className="bg-brand-purple/10 border border-brand-purple/20 text-brand-purple px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm">
+          {filteredSongs.length} músicas
+        </span>
       </div>
 
       {/* Rich List */}

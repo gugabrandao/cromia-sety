@@ -87,7 +87,7 @@ function EditableLine({ line, originalIdx, isTabLine, isEditing, settings, getEf
   );
 }
 
-export default function SongView() {
+export default function Cifras() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
