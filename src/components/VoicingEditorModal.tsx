@@ -107,12 +107,19 @@ export default function VoicingEditorModal({ chordName, initialVoicing, onSave, 
     }
   }, [fingers, barres, baseFret, mutedStrings, chordName]);
 
-  const toggleFret = (string: number, fret: number) => {
+  const toggleFret = (string: number, fret: number, isCtrl: boolean = false) => {
+    // Check if clicking on an existing barre position
     const existingBarre = barres.find(b => b.fret === fret && string <= b.fromString && string >= b.toString);
     if (existingBarre) {
+      if (isCtrl) {
+        setBarres(barres.filter(b => b !== existingBarre));
+        return;
+      }
+      
       const cycle = [undefined, 1, 2, 3, 4, 'T', 'REMOVE'];
       const currentIndex = cycle.indexOf(existingBarre.finger as any);
       const nextValue = cycle[currentIndex + 1];
+
       if (nextValue === 'REMOVE') {
         setBarres(barres.filter(b => b !== existingBarre));
       } else {
@@ -122,18 +129,26 @@ export default function VoicingEditorModal({ chordName, initialVoicing, onSave, 
     }
 
     const existing = fingers.find(f => f.string === string && f.fret === fret);
-    if (!existing) {
-      setFingers([...fingers.filter(f => f.string !== string), { string, fret }]);
-      setMutedStrings(mutedStrings.filter(s => s !== string));
-    } else {
+
+    if (existing) {
+      if (isCtrl) {
+        setFingers(fingers.filter(f => !(f.string === string && f.fret === fret)));
+        return;
+      }
+      // Cycle: null -> 1 -> 2 -> 3 -> 4 -> T -> remove
       const cycle = [undefined, 1, 2, 3, 4, 'T', 'REMOVE'];
       const currentIndex = cycle.indexOf(existing.finger as any);
       const nextValue = cycle[currentIndex + 1];
+
       if (nextValue === 'REMOVE') {
         setFingers(fingers.filter(f => !(f.string === string && f.fret === fret)));
       } else {
         setFingers(fingers.map(f => (f.string === string && f.fret === fret) ? { ...f, finger: nextValue as any } : f));
       }
+    } else if (!isCtrl) {
+      // Add a dot without number
+      setFingers([...fingers.filter(f => f.string !== string), { string, fret }]);
+      setMutedStrings(mutedStrings.filter(s => s !== string));
     }
   };
 
@@ -165,20 +180,23 @@ export default function VoicingEditorModal({ chordName, initialVoicing, onSave, 
     }
   };
 
-  const onMouseUp = (string: number, fret: number) => {
+  const onMouseUp = (string: number, fret: number, e: React.MouseEvent) => {
     if (!dragStart) return;
+
     if (dragPreview) {
       setBarres([...barres.filter(b => b.fret !== fret), {
         fret: dragPreview.fret,
         fromString: dragPreview.from,
         toString: dragPreview.to
       }]);
+      // Cleanup fingers and mutes in range
       setFingers(fingers.filter(f => f.fret !== fret || f.string > dragPreview.from || f.string < dragPreview.to));
       setMutedStrings(mutedStrings.filter(s => !(s <= dragPreview.from && s >= dragPreview.to)));
     } else if (dragStart.removing && dragStart.string === string && dragStart.fret === fret) {
-      toggleFret(string, fret);
+      // Use the cycle logic
+      toggleFret(string, fret, e.ctrlKey);
     } else if (dragStart.string === string && dragStart.fret === fret) {
-      toggleFret(string, fret);
+      toggleFret(string, fret, e.ctrlKey);
     }
     setDragStart(null);
     setDragPreview(null);
@@ -270,8 +288,9 @@ export default function VoicingEditorModal({ chordName, initialVoicing, onSave, 
                                 key={s}
                                 onMouseDown={() => onMouseDown(s, h)}
                                 onMouseEnter={() => onMouseEnter(s, h)}
-                                onMouseUp={() => onMouseUp(s, h)}
-                                className="w-10 h-full flex items-center justify-center cursor-pointer relative"
+                                onMouseUp={(e) => onMouseUp(s, h, e)}
+                                onContextMenu={(e) => e.preventDefault()}
+                                className="w-10 h-full relative flex items-center justify-center cursor-pointer group/cell z-20"
                               >
                                 <AnimatePresence mode="popLayout">
                                   {finger && (
@@ -313,6 +332,11 @@ export default function VoicingEditorModal({ chordName, initialVoicing, onSave, 
                                   key={idx}
                                   className="absolute h-10 top-1/2 -translate-y-1/2 bg-brand-purple border-2 border-white rounded-full shadow-lg z-10 pointer-events-none flex items-center justify-center"
                                   style={{ left, width }}
+                                  onMouseUp={(e) => onMouseUp(b.fromString, h, e)}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    toggleFret(b.fromString, h, true);
+                                  }}
                                 >
                                   {b.finger && (
                                     <span className="text-white text-xs font-black">{b.finger}</span>
