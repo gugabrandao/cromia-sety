@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Mic2, LayoutDashboard, User,
-  Sun, Moon, Globe, ListMusic, LogOut
+  Sun, Moon, Globe, ListMusic, LogOut,
+  Music
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
@@ -100,6 +101,14 @@ export default function Layout({ children }: LayoutProps) {
             >
               <Mic2 className="w-6 h-6" />
               <span className="absolute left-full ml-4 px-2 py-1 bg-brand-purple text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Meus Setlists</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/chord-maker')}
+              className={`p-3 rounded-full transition-all group relative ${isActive('/chord-maker') ? 'bg-brand-purple/20 text-brand-accent' : 'text-foreground/40 hover:text-brand-purple'}`}
+            >
+              <Music className="w-6 h-6" />
+              <span className="absolute left-full ml-4 px-2 py-1 bg-brand-purple text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Chord Maker</span>
             </button>
 
 

@@ -11,6 +11,9 @@ import {
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
 import { fetchSongMetadata } from '../services/spotifyService';
+import ChordDictionary from '../components/ChordDictionary';
+import VoicingEditorModal from '../components/VoicingEditorModal';
+import guitarChords from '@tombatossals/chords-db/lib/guitar.json';
 
 // Stable controlled editor for plain-text lines — prevents React/browser DOM conflict
 function EditableLine({ line, originalIdx, isTabLine, isEditing, settings, getEffectiveColor, handleLineUpdate, handleContextMenu, isInsideChorus, handleDeleteLine, handleInsertLine }: {
@@ -161,6 +164,7 @@ export default function Cifras() {
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
   const [lastInsertedLineIdx, setLastInsertedLineIdx] = useState<number | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedChordForEdit, setSelectedChordForEdit] = useState<string | null>(null);
 
   useEffect(() => {
     if (lastInsertedLineIdx !== null && isEditing && editMode === 'live') {
@@ -182,30 +186,31 @@ export default function Cifras() {
     const defaults = {
       title: { size: 69, color: '#fffceb', font: 'font-outfit' },
       artist: { size: 50, color: '#f07400', font: 'font-outfit' },
-      observations: { size: 37, color: '#bd5b00', font: 'font-outfit', italic: false },
+      observations: { size: 34, color: '#bd5b00', font: 'font-outfit', italic: false },
       sections: { size: 20, color: '#f07400', font: 'font-mono-custom', italic: false, bold: false },
       chords: { size: 25, color: '#ff8800', font: 'font-mono-custom' },
       lyrics: { size: 25, color: '#ffffff', font: 'font-outfit' },
       tabs: { size: 17, color: '#ffffff', font: 'font-fira' },
       metadata: { size: 23, color: '#ffffff', font: 'font-inter', bold: true },
       observationsBg: '#ff8800',
-      headerGap: -3,
+      headerGap: -8,
       chordLyricGap: -8,
-      lineGap: 7,
-      instrumentalGap: 0,
-      plainLineGap: 0,
-      paragraphGap: 4,
-      sectionGapTop: 30,
+      lineGap: 8,
+      instrumentalGap: -13,
+      plainLineGap: -24,
+      paragraphGap: 9,
+      sectionGapTop: 0,
       sectionGapBottom: 7,
       showTabs: false,
       showSections: true,
       showMetadata: true,
       showArtwork: true,
       isDarkMode: false,
-      scrollSpeed: 7,
+      scrollSpeed: 5,
       useFlats: false,
-      metadataGapTop: 7,
-      isWarmWhite: false
+      metadataGapTop: 6,
+      isWarmWhite: true,
+      observationsGapTop: 10
     };
     return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
   });
@@ -480,6 +485,59 @@ export default function Cifras() {
     }
 
     return originalOffset;
+  };
+
+  const getDefaultVoicing = (chordName: string) => {
+    if (!guitarChords || !guitarChords.chords) return null;
+
+    let key = '';
+    let suffix = '';
+    
+    if (chordName.length >= 2 && (chordName[1] === '#' || chordName[1] === 'b')) {
+      key = chordName.substring(0, 2);
+      suffix = chordName.substring(2);
+    } else {
+      key = chordName.substring(0, 1);
+      suffix = chordName.substring(1);
+    }
+
+    let dbSuffix = suffix;
+    if (suffix === '') dbSuffix = 'major';
+    if (suffix === 'm') dbSuffix = 'minor';
+    if (suffix === 'M') dbSuffix = 'major';
+    
+    let dbKey = key;
+    if (key === 'C#') dbKey = 'Csharp';
+    if (key === 'F#') dbKey = 'Fsharp';
+
+    const chordEntries = (guitarChords as any).chords[dbKey];
+    if (chordEntries) {
+      const entry = chordEntries.find((c: any) => c.suffix === dbSuffix) || chordEntries[0];
+      if (entry && entry.positions && entry.positions[0]) {
+        const pos = entry.positions[0];
+        const fingers: any[] = [];
+        
+        pos.frets.forEach((f: number, i: number) => {
+          const string = 6 - i;
+          if (f === 0) {
+            fingers.push([string, 0]);
+          } else if (f === -1) {
+            fingers.push([string, 'x']);
+          } else if (f > 0) {
+            const fingerNum = pos.fingers[i] > 0 ? pos.fingers[i].toString() : undefined;
+            fingers.push([string, f, fingerNum]);
+          }
+        });
+
+        return {
+          fingers,
+          barres: pos.barres?.map((fret: number) => ({ fromString: 6, toString: 1, fret })) || [],
+          position: pos.baseFret || 1
+        };
+      }
+    }
+    
+    return null;
   };
 
   const addChordToLine = (lineIdx: number, plainOffset: number, chordName: string = '') => {
@@ -880,7 +938,12 @@ export default function Cifras() {
                 <span contentEditable={isEditing} suppressContentEditableWarning spellCheck="false"
                   onContextMenu={(e) => { if (!isEditing) return; e.stopPropagation(); handleContextMenu(e, originalIdx, isInsideChorus, tok.startOffset); }}
                   onBlur={(e) => handlePartChange(originalIdx, tok.partIdx, e.currentTarget.innerText.trim(), true)}
-                  className={`whitespace-pre min-h-[1.2em] transition-all ${tok.hasChord ? `font-bold ${settings.chords.font}` : ''} ${isEditing && tok.hasChord ? 'outline-none min-w-[1ch] rounded outline outline-1 outline-dashed outline-brand-purple/30 focus:outline-brand-purple focus:outline-solid' : ''}`}
+                  onClick={() => {
+                    if (!isEditing && tok.hasChord) {
+                      setSelectedChordForEdit(tok.top);
+                    }
+                  }}
+                  className={`whitespace-pre min-h-[1.2em] transition-all ${tok.hasChord ? `font-bold ${settings.chords.font}` : ''} ${isEditing && tok.hasChord ? 'outline-none min-w-[1ch] rounded outline outline-1 outline-dashed outline-brand-purple/30 focus:outline-brand-purple focus:outline-solid' : 'cursor-pointer hover:text-brand-accent transition-colors'}`}
                   style={{ fontSize: `${settings.chords.size}px`, color: getEffectiveColor(settings.chords.color), lineHeight: '1' }}
                   dangerouslySetInnerHTML={{ __html: tok.top || '' }}
                 />
@@ -1034,7 +1097,7 @@ export default function Cifras() {
   };
 
   const handleDefinitiveChange = async () => {
-    if (!window.confirm("Essa ação vai reescrever o arquivo original permanentemente. Deseja continuar?")) return;
+    if (!window.confirm("Essa_ação_vai_reescrever_o_arquivo_original_permanentemente._Deseja_continuar?".replace(/_/g, ' '))) return;
     const lines = editedContent.split('\n');
     const filtered = lines.map(line => {
       const isTab = /^[A-Ge]\|[-|0-9a-z ]+/i.test(line.trim()) || line.includes('---');
@@ -1054,6 +1117,36 @@ export default function Cifras() {
       alert("Salvo com sucesso!");
     } catch (error) { console.error('Error applying definitive change:', error); }
   };
+
+  const handleSaveVoicing = async (chord: string, voicing: any) => {
+    if (!song || !id) return;
+    
+    const newSettings = {
+      ...(song.settings || {}),
+      custom_voicings: {
+        ...(song.settings?.custom_voicings || {}),
+        [chord]: voicing
+      }
+    };
+
+    try {
+      const { error } = await (supabase.from('cromiasety_songs') as any)
+        .update({ settings: newSettings })
+        .eq('id', id);
+
+      if (error) throw error;
+      setSong({ ...song, settings: newSettings });
+    } catch (error) {
+      console.error('Error saving voicing:', error);
+    }
+  };
+
+  const extractedChords = Array.from(new Set(
+    (editedContent.match(/\[(.*?)\]/g) || [])
+      .map(m => m.slice(1, -1))
+      .filter(c => isChord(c))
+      .map(c => currentTransposeLine(c, currentTranspose))
+  ));
 
   // --- 8. Render Logic ---
   const renderEditorContent = () => {
@@ -1324,6 +1417,10 @@ export default function Cifras() {
                     <label className="text-xs uppercase opacity-40">{t('metadata_gap_top')}</label>
                     <input type="range" min="-10" max="40" value={settings.metadataGapTop ?? 8} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('metadataGapTop', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase opacity-40">{t('observations_gap_top')}</label>
+                    <input type="range" min="-20" max="60" value={settings.observationsGapTop ?? 0} onPointerDown={() => addSettingsToHistory(settings)} onChange={(e) => updateGlobalSetting('observationsGapTop', parseInt(e.target.value), false)} className="w-full accent-brand-purple" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1363,10 +1460,10 @@ export default function Cifras() {
                   <Moon className="w-20 h-20 text-brand-purple" fill="currentColor" />
                 </motion.div>
                 <h2 className="text-6xl md:text-8xl font-black text-white mb-6 tracking-tighter uppercase">
-                  {setlistSongs[currentSetlistIndex]?.interval_name || 'Hora da Pausa!'}
+                  {setlistSongs[currentSetlistIndex]?.interval_name || t('pause_title')}
                 </h2>
                 <p className="text-2xl md:text-3xl text-brand-accent font-bold mb-12 italic">
-                  Aproveita pra beber uma água e descansar! 🥤
+                  {t('pause_description')}
                 </p>
                 {setlistSongs[currentSetlistIndex]?.interval_duration && (
                   <div className="px-16 py-8 rounded-[3rem] bg-brand-purple text-white text-5xl font-black shadow-2xl shadow-brand-purple/50">
@@ -1402,7 +1499,7 @@ export default function Cifras() {
                     </div>
                   )}
                   {song?.observations && (
-                    <div className={`mt-0 ${isDarkMode ? 'bg-white/10' : 'bg-foreground/10'} pl-4 pr-4 w-fit ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color) }}>
+                    <div className={`mt-0 ${isDarkMode ? 'bg-white/10' : 'bg-foreground/10'} pl-4 pr-4 w-fit ${settings.observations.font} ${settings.observations.italic ? 'italic' : ''}`} style={{ fontSize: `${settings.observations.size}px`, color: getEffectiveColor(settings.observations.color), marginTop: `${settings.observationsGapTop ?? 0}px` }}>
                       {song.observations}
                     </div>
                   )}
@@ -1453,6 +1550,14 @@ export default function Cifras() {
               </div>
             )}
           </div>
+
+          {!id?.startsWith('interval_') && (
+            <ChordDictionary 
+              chords={extractedChords}
+              customVoicings={song?.settings?.custom_voicings || {}}
+              onSaveVoicing={handleSaveVoicing}
+            />
+          )}
         </motion.main>
       </AnimatePresence>
 
@@ -1475,6 +1580,17 @@ export default function Cifras() {
         </div>
       )}
       {contextMenu && <div className="fixed inset-0 z-[90]" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />}
+      
+      <AnimatePresence>
+        {selectedChordForEdit && (
+          <VoicingEditorModal
+            chordName={selectedChordForEdit}
+            initialVoicing={song?.settings?.custom_voicings?.[selectedChordForEdit] || getDefaultVoicing(selectedChordForEdit)}
+            onSave={(voicing) => handleSaveVoicing(selectedChordForEdit, voicing)}
+            onClose={() => setSelectedChordForEdit(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

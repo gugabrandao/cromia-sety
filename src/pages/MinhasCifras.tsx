@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
-import { Search, Play, Settings2, Guitar, Activity, Settings, Loader2, Save, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { Search, Play, Settings2, Guitar, Activity, Settings, Loader2, Save, Plus, Trash2, ChevronDown, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSongMetadata } from '../services/spotifyService';
 import SearchModal from '../components/SearchModal';
@@ -34,6 +34,27 @@ export default function MinhasCifras() {
       showDesc: false
     };
   });
+
+  // List Visibility Settings
+  const [listSettings, setListSettings] = useState(() => {
+    const saved = localStorage.getItem('musicbox_list_settings');
+    return saved ? JSON.parse(saved) : {
+      showArtwork: true,
+      showArtist: true,
+      showKey: true,
+      showBpm: true,
+      showDuration: true,
+      showObservations: true,
+      showTempoPerf: false,
+      showTomPerf: false,
+      showBpmPerf: false
+    };
+  });
+  const [isListSettingsOpen, setIsListSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('musicbox_list_settings', JSON.stringify(listSettings));
+  }, [listSettings]);
 
   // Save config changes
   useEffect(() => {
@@ -80,8 +101,8 @@ export default function MinhasCifras() {
       if (sortBy === 'observations') {
         const aObs = a.observations || '';
         const bObs = b.observations || '';
-        if (aObs && !bObs) return -1;
-        if (!aObs && bObs) return 1;
+        if (aObs === '' && bObs !== '') return 1;
+        if (aObs !== '' && bObs === '') return -1;
         return aObs.localeCompare(bObs);
       }
       return 0;
@@ -117,12 +138,12 @@ export default function MinhasCifras() {
         .select();
 
       if (_error) throw _error;
-      
+
       if (!data || data.length === 0) {
         alert('A música não pôde ser apagada do banco de dados. Isso geralmente acontece por falta de permissão (RLS) se a cifra foi importada com um ID de usuário diferente do seu.');
         return;
       }
-      
+
       setSongs(prev => prev.filter(s => s.id !== id));
     } catch (err) {
       console.error('Error deleting song:', err);
@@ -311,23 +332,30 @@ export default function MinhasCifras() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="w-full appearance-none bg-foreground/5 border border-foreground/10 text-foreground font-bold rounded-2xl py-4 pl-6 pr-12 focus:outline-none focus:ring-2 focus:ring-brand-purple/50 focus:border-brand-purple transition-all cursor-pointer"
+            className="w-full appearance-none bg-foreground/5 border border-foreground/10 text-foreground/50 font-normal rounded-2xl py-4 pl-6 pr-12 focus:outline-none focus:ring-1 focus:ring-brand-purple/50 focus:border-brand-purple transition-all cursor-pointer"
           >
-            <option value="title" className="bg-background text-foreground">Alfabética</option>
-            <option value="artist" className="bg-background text-foreground">Por Artista</option>
-            <option value="observations" className="bg-background text-foreground">Com Observações</option>
+            <option value="title" className="bg-background text-foreground/50">{t('sort_alphabetical')}</option>
+            <option value="artist" className="bg-background text-foreground/50">{t('sort_artist')}</option>
+            <option value="observations" className="bg-background text-foreground/50">{t('sort_observations')}</option>
           </select>
           <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
             <ChevronDown className="w-5 h-5" />
           </div>
         </div>
       </div>
-      
-      {/* Total Badge */}
-      <div className="mb-6 flex">
-        <span className="bg-brand-purple/10 border border-brand-purple/20 text-brand-purple px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm">
-          {filteredSongs.length} músicas
+
+      {/* Total Badge & List Settings */}
+      <div className="mb-6 mt-6 flex items-center justify-between">
+        <span className="bg-foreground/5 border border-foreground/10 text-foreground/50 px-4 py-1.5 rounded-full text-lg font-semibold tracking-wider shadow-sm">
+          {filteredSongs.length} Músicas no Total
         </span>
+        <button
+          onClick={() => setIsListSettingsOpen(true)}
+          className="p-3 rounded-xl bg-foreground/5 hover:bg-brand-purple/20 text-foreground/40 hover:text-brand-purple transition-all"
+          title="Configurações da Lista"
+        >
+          <Settings2 className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Rich List */}
@@ -348,35 +376,61 @@ export default function MinhasCifras() {
               className="group flex items-center p-3 pr-6 bg-foreground/5 hover:bg-foreground/10 border border-foreground/5 hover:border-brand-purple/30 rounded-2xl transition-all cursor-pointer"
             >
               {/* Thumbnail */}
-              <div className="w-16 h-16 rounded-xl bg-foreground/10 overflow-hidden shrink-0 shadow-md mr-4 relative">
-                {song.artwork_url ? (
-                  <img src={song.artwork_url} alt={song.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center"><Guitar className="w-6 h-6 text-foreground/30" /></div>
-                )}
-                {/* Overlay Play Icon */}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="w-6 h-6 text-white fill-white" />
+              {listSettings.showArtwork && (
+                <div className="w-16 h-16 rounded-xl bg-foreground/10 overflow-hidden shrink-0 shadow-md mr-4 relative">
+                  {song.artwork_url ? (
+                    <img src={song.artwork_url} alt={song.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center"><Guitar className="w-6 h-6 text-foreground/30" /></div>
+                  )}
+                  {/* Overlay Play Icon */}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Play className="w-6 h-6 text-white fill-white" />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Info */}
               <div className="flex-1 min-w-0 pr-4">
                 <h3 className="text-xl font-bold truncate leading-tight">{song.title}</h3>
-                <p className="text-sm text-foreground/60 truncate">{song.artist}</p>
+                {listSettings.showArtist && <p className="text-sm text-foreground/60 truncate">{song.artist}</p>}
+                {listSettings.showObservations && song.observations && (
+                  <p className="text-sm text-brand-accent italic mt-1 line-clamp-1">{song.observations}</p>
+                )}
               </div>
 
               {/* Badges & Actions */}
               <div className="flex items-center gap-2 shrink-0">
-                {song.original_key && (
+                {listSettings.showKey && song.original_key && (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-purple/10 text-brand-purple border border-brand-purple/20">
                     <span className="text-xs font-black">{song.original_key}</span>
                   </div>
                 )}
-                {song.bpm && (
+                {listSettings.showBpm && song.bpm && (
                   <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20">
                     <Activity className="w-3.5 h-3.5" />
                     <span className="text-xs font-bold">{song.bpm}</span>
+                  </div>
+                )}
+                {listSettings.showDuration && song.duration_ms && (
+                  <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground/5 text-foreground/40 border border-foreground/10">
+                    <span className="text-xs font-bold">{msToTime(song.duration_ms)}</span>
+                  </div>
+                )}
+                {listSettings.showTomPerf && song.tom_performance && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                    <span className="text-xs font-black">{song.tom_performance}</span>
+                  </div>
+                )}
+                {listSettings.showBpmPerf && song.bpm_performance && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-purple/10 text-brand-purple border border-brand-purple/20">
+                    <Activity className="w-3.5 h-3.5" />
+                    <span className="text-xs font-bold">{song.bpm_performance}</span>
+                  </div>
+                )}
+                {listSettings.showTempoPerf && song.tempo_performance_ms && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground/5 text-foreground/40 border border-foreground/10">
+                    <span className="text-xs font-bold">{msToTime(song.tempo_performance_ms)}</span>
                   </div>
                 )}
 
@@ -417,7 +471,7 @@ export default function MinhasCifras() {
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><Guitar className="w-8 h-8 text-foreground/20" /></div>
                 )}
-                <button 
+                <button
                   onClick={handleFetchArtwork}
                   className="absolute inset-0 bg-brand-purple/80 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-[10px] font-bold"
                 >
@@ -538,8 +592,53 @@ export default function MinhasCifras() {
         </div>
       )}
 
-      <SearchModal 
-        isOpen={isSearchOpen} 
+      {/* Modal de Configurações da Lista */}
+      {isListSettingsOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-background border border-foreground/10 rounded-3xl p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-black">Visualização</h2>
+              <button onClick={() => setIsListSettingsOpen(false)} className="p-2 hover:bg-foreground/5 rounded-full transition-all">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { key: 'showArtist', label: 'Nome do Artista' },
+                { key: 'showArtwork', label: 'Capa do Álbum' },
+                { key: 'showTomPerf', label: 'Tom (Performance)' },
+                { key: 'showBpmPerf', label: 'BPM (Performance)' },
+                { key: 'showTempoPerf', label: 'Duração (Performance)' },
+                { key: 'showKey', label: 'Tom (Metadado)' },
+                { key: 'showBpm', label: 'BPM (Metadado)' },
+                { key: 'showDuration', label: 'Duração (Metadado)' },
+                { key: 'showObservations', label: 'Observações / Notas' }
+              ].map((item) => (
+                <label key={item.key} className="flex items-center justify-between p-4 rounded-2xl bg-foreground/5 hover:bg-foreground/10 cursor-pointer transition-all">
+                  <span className="font-bold">{item.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={(listSettings as any)[item.key]}
+                    onChange={(e) => setListSettings({ ...listSettings, [item.key]: e.target.checked })}
+                    className="w-6 h-6 accent-brand-purple"
+                  />
+                </label>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setIsListSettingsOpen(false)}
+              className="w-full mt-8 py-4 bg-brand-purple text-white font-bold rounded-2xl hover:scale-105 transition-all shadow-xl shadow-brand-purple/20"
+            >
+              PRONTO
+            </button>
+          </div>
+        </div>
+      )}
+
+      <SearchModal
+        isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSongAdded={() => fetchSongs()}
       />

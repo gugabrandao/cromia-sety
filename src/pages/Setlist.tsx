@@ -120,6 +120,27 @@ export default function Setlist() {
     localStorage.setItem('musicbox_palco_config', JSON.stringify(palcoConfig));
   }, [palcoConfig]);
 
+  // List Visibility Settings
+  const [listSettings, setListSettings] = useState(() => {
+    const saved = localStorage.getItem('musicbox_setlist_list_settings');
+    return saved ? JSON.parse(saved) : {
+      showArtwork: true,
+      showArtist: true,
+      showTomPerf: true,
+      showBpmPerf: true,
+      showTempoPerf: true,
+      showKey: true,
+      showBpm: true,
+      showDuration: true,
+      showObservations: true
+    };
+  });
+  const [isListSettingsOpen, setIsListSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('musicbox_setlist_list_settings', JSON.stringify(listSettings));
+  }, [listSettings]);
+
   useEffect(() => {
     fetchSetlistData();
   }, [id]);
@@ -497,12 +518,19 @@ export default function Setlist() {
               <Pencil className="w-6 h-6 text-foreground/20 group-hover:text-brand-purple transition-colors" />
             </div>
           )}
-          <div className="flex flex-wrap gap-4 text-foreground/50 text-sm font-bold uppercase tracking-widest">
+          <div className="flex flex-wrap items-center gap-4 text-foreground/50 text-sm font-bold uppercase tracking-widest">
             <span>{setlistSongs.filter(s => !s.is_interval).length} Músicas</span>
             <span className="flex items-center gap-1 text-foreground/50"><Watch className="w-5 h-5" /> {msToTime(totalMs)} Total</span>
             {setlist.event_date && (
               <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {setlist.event_date.split('-').reverse().join('/')}</span>
             )}
+            <button
+              onClick={() => setIsListSettingsOpen(true)}
+              className="p-1.5 rounded-lg bg-foreground/5 hover:bg-brand-purple/20 text-foreground/40 hover:text-brand-purple transition-all"
+              title="Configurações da Lista"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -606,14 +634,19 @@ export default function Setlist() {
                       className="group flex items-center p-3 pl-12 pr-6 bg-foreground/5 hover:bg-foreground/10 border border-foreground/5 rounded-2xl transition-all cursor-pointer"
                     >
                       <div className="w-12 text-center font-bold text-foreground/30">{songNumber}</div>
-
-                      <div className="w-14 h-14 rounded-xl bg-foreground/10 overflow-hidden shrink-0 shadow-md mr-4 relative">
-                        {song.artwork_url ? <img src={song.artwork_url} className="w-full h-full object-cover" /> : <Guitar className="w-6 h-6 m-auto mt-4 text-foreground/30" />}
-                      </div>
+                      
+                      {listSettings.showArtwork && (
+                        <div className="w-14 h-14 rounded-xl bg-foreground/10 overflow-hidden shrink-0 shadow-md mr-4 relative">
+                          {song.artwork_url ? <img src={song.artwork_url} className="w-full h-full object-cover" /> : <Guitar className="w-6 h-6 m-auto mt-4 text-foreground/30" />}
+                        </div>
+                      )}
 
                       <div className="flex-1 min-w-0 pr-4">
                         <h3 className="text-xl font-bold truncate leading-tight">{song.title}</h3>
-                        <p className="text-sm text-foreground/60 truncate">{song.artist}</p>
+                        {listSettings.showArtist && <p className="text-sm text-foreground/60 truncate">{song.artist}</p>}
+                        {listSettings.showObservations && song.observations && (
+                          <p className="text-sm text-brand-accent italic mt-1 line-clamp-1">{song.observations}</p>
+                        )}
                         {/* Subtotal do Set (Exibido apenas na última música antes da pausa ou no final do show) */}
                         {setSubtotal > 0 && (
                           <div className="mt-2 flex items-center">
@@ -625,20 +658,40 @@ export default function Setlist() {
                       </div>
 
                       <div className="flex items-center gap-4 shrink-0">
-                        <div className="flex flex-col items-end">
-                          <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest mb-1">Música</span>
-                          <span className="text-sm font-black text-foreground/80 tabular-nums">
-                            {msToTime(link.song?.tempo_performance_ms || link.song?.duration_ms)}
-                          </span>
-                        </div>
-                        {(link.song?.tom_performance || link.song?.original_key) && (
-                          <span className="text-sm font-black text-brand-purple bg-brand-purple/10 px-2 py-1 rounded">
-                            {link.song?.tom_performance || link.song?.original_key}
+                        {listSettings.showTempoPerf && song.tempo_performance_ms && (
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest mb-1">Duração (Perf)</span>
+                            <span className="text-sm font-black text-foreground/80 tabular-nums">
+                              {msToTime(song.tempo_performance_ms)}
+                            </span>
+                          </div>
+                        )}
+                        {listSettings.showDuration && song.duration_ms && (
+                          <div className="flex flex-col items-end border-l border-foreground/10 pl-4">
+                            <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest mb-1">Música</span>
+                            <span className="text-sm font-black text-foreground/80 tabular-nums">
+                              {msToTime(song.duration_ms)}
+                            </span>
+                          </div>
+                        )}
+                        {listSettings.showTomPerf && song.tom_performance && (
+                          <span className="text-sm font-black text-orange-500 bg-orange-500/10 px-2 py-1 rounded">
+                            {song.tom_performance}
                           </span>
                         )}
-                        {(link.song?.bpm_performance || link.song?.bpm) && (
+                        {listSettings.showKey && song.original_key && (
+                          <span className="text-sm font-black text-brand-purple bg-brand-purple/10 px-2 py-1 rounded">
+                            {song.original_key}
+                          </span>
+                        )}
+                        {listSettings.showBpmPerf && song.bpm_performance && (
+                          <span className="text-sm font-bold text-brand-purple bg-brand-purple/10 px-2 py-1 rounded">
+                            {song.bpm_performance} BPM
+                          </span>
+                        )}
+                        {listSettings.showBpm && song.bpm && (
                           <span className="text-sm font-bold text-blue-500 bg-blue-500/10 px-2 py-1 rounded">
-                            {link.song?.bpm_performance || link.song?.bpm} BPM
+                            {song.bpm} BPM
                           </span>
                         )}
 
@@ -657,6 +710,51 @@ export default function Setlist() {
           </DndContext>
         )}
       </div>
+
+      {/* Modal de Configurações da Lista */}
+      {isListSettingsOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-background border border-foreground/10 rounded-3xl p-8 max-w-sm w-full shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-black">Visualização</h2>
+              <button onClick={() => setIsListSettingsOpen(false)} className="p-2 hover:bg-foreground/5 rounded-full transition-all">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { key: 'showArtist', label: 'Nome do Artista' },
+                { key: 'showArtwork', label: 'Capa do Álbum' },
+                { key: 'showTomPerf', label: 'Tom (Performance)' },
+                { key: 'showBpmPerf', label: 'BPM (Performance)' },
+                { key: 'showTempoPerf', label: 'Duração (Performance)' },
+                { key: 'showKey', label: 'Tom (Metadado)' },
+                { key: 'showBpm', label: 'BPM (Metadado)' },
+                { key: 'showDuration', label: 'Duração (Metadado)' },
+                { key: 'showObservations', label: 'Observações / Notas' }
+              ].map((item) => (
+                <label key={item.key} className="flex items-center justify-between p-4 rounded-2xl bg-foreground/5 hover:bg-foreground/10 cursor-pointer transition-all">
+                  <span className="font-bold text-sm">{item.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={(listSettings as any)[item.key]}
+                    onChange={(e) => setListSettings({ ...listSettings, [item.key]: e.target.checked })}
+                    className="w-6 h-6 accent-brand-purple"
+                  />
+                </label>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setIsListSettingsOpen(false)}
+              className="w-full mt-8 py-4 bg-brand-purple text-white font-bold rounded-2xl hover:scale-105 transition-all shadow-xl shadow-brand-purple/20"
+            >
+              PRONTO
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal / Slide-over para adicionar músicas */}
       {showAddModal && (

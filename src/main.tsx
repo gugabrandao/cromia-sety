@@ -15,6 +15,7 @@ import Login from './pages/Login'
 import MinhasCifras from './pages/MinhasCifras'
 import MeusSetlists from './pages/MeusSetlists'
 import Setlist from './pages/Setlist'
+import ChordMaker from './pages/ChordMaker'
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -61,6 +62,7 @@ function App() {
           <Route path="/setlists" element={<MeusSetlists />} />
           <Route path="/setlists/:id" element={<Setlist />} />
           <Route path="/song/:id" element={<Cifras />} />
+          <Route path="/chord-maker" element={<ChordMaker />} />
           <Route path="/search" element={<Busca />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
