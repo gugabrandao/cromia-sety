@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
+// import { useTranslation } from 'react-i18next';
 import { SVGuitarChord } from 'svguitar';
 import { Chord as TonalChord, Note } from 'tonal';
 import {
