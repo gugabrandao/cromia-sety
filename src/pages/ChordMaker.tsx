@@ -38,7 +38,7 @@ interface Barre {
 }
 
 export default function ChordMaker() {
-  const { t } = useTranslation();
+  // const { t } = useTranslation();
   const [fingers, setFingers] = useState<Finger[]>([]);
   const [mutedStrings, setMutedStrings] = useState<number[]>([]);
   const [baseFret, setBaseFret] = useState(1);
@@ -303,7 +303,7 @@ export default function ChordMaker() {
             <div className="flex flex-col gap-3">
               <AnimatePresence mode="popLayout">
                 {detectedChords.length > 0 ? (
-                  detectedChords.map((chord, idx) => (
+                  detectedChords.map((chord) => (
                     <motion.div
                       key={chord}
                       initial={{ opacity: 0, x: -20 }}
@@ -448,7 +448,7 @@ export default function ChordMaker() {
                       <div className="absolute top-0 bottom-0 left-12 right-12 pointer-events-none">
                         <div className="relative h-full">
                           {/* Barres Layer */}
-                          {barres.filter(b => b.fret === h).map((b, idx) => {
+                          {barres.filter(b => b.fret === h).map((b) => {
                             const fromIdx = [6, 5, 4, 3, 2, 1].indexOf(b.fromString);
                             const toIdx = [6, 5, 4, 3, 2, 1].indexOf(b.toString);
 
@@ -460,7 +460,7 @@ export default function ChordMaker() {
 
                             return (
                               <div
-                                key={idx}
+                                key={`${b.fromString}-${b.toString}`}
                                 className="absolute h-10 top-1/2 -translate-y-1/2 bg-brand-purple border-2 border-white rounded-full shadow-lg z-10 flex items-center justify-center"
                                 style={{ left, width }}
                                 onMouseUp={(e) => onMouseUp(b.fromString, h, e)}
